@@ -1,10 +1,13 @@
 import { BoardRow } from "@/components/BoardRow";
-import { BidStub } from "@/components/BidStub";
+import { BidForm } from "@/components/BidForm";
+import { getBoardListings } from "@/db";
 import { sortListings } from "@/lib/rankings";
-import { seedListings } from "@/lib/seed";
 
-export default function BoardPage() {
-  const ranked = sortListings(seedListings);
+export const dynamic = "force-dynamic";
+
+export default async function BoardPage() {
+  const listings = await getBoardListings();
+  const ranked = sortListings(listings);
 
   return (
     <div className="space-y-8">
@@ -22,7 +25,7 @@ export default function BoardPage() {
         ))}
       </section>
 
-      <BidStub />
+      <BidForm listings={ranked} />
     </div>
   );
 }
