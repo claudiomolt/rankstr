@@ -1,4 +1,4 @@
-import { SimplePool, useWebSocketImplementation } from "nostr-tools/pool";
+import { SimplePool, useWebSocketImplementation as setWebSocketImpl } from "nostr-tools/pool";
 import WebSocket from "ws";
 import { decodeNpub } from "./npub";
 import type { FetchProfileOptions, Profile } from "./types";
@@ -15,7 +15,8 @@ let wsWired = false;
 function ensureNodeWebSocket(): void {
   if (wsWired) return;
   if (typeof window === "undefined") {
-    useWebSocketImplementation(WebSocket as unknown as typeof globalThis.WebSocket);
+    // nostr-tools setter (not a React Hook) — aliased so eslint hooks rule ignores it
+    setWebSocketImpl(WebSocket as unknown as typeof globalThis.WebSocket);
   }
   wsWired = true;
 }
