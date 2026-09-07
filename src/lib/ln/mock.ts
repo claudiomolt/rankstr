@@ -7,15 +7,23 @@
  */
 
 import { createHash, randomBytes } from "crypto";
+import { globalSingleton, resetGlobalSingleton } from "@/lib/global-singleton";
 import type { Invoice, InvoiceRequest, VerifyResult } from "./types";
 
 export const MOCK_VERIFY_SCHEME = "mock://verify/";
 const EXPIRY_MS = 30 * 60 * 1000;
+const REGISTRY_KEY = "mock-invoices";
 
 type MockState = "pending" | "settled" | "failed";
 
-/** Process-local. Mock mode is a dev affordance, not a persistence story. */
-const mockInvoices = new Map<string, MockState>();
+/**
+ * Process-local, and shared across route bundles so the route that reserves an
+ * invoice and the route that settles it see the same registry. Mock mode is a
+ * dev affordance, not a persistence story.
+ */
+function mockInvoices(): Map<string, MockState> {
+  return globalSingleton(REGISTRY_KEY, () => new Map<string, MockState>());
+}
 
 function networkPrefix(): "lnbc" | "lntb" {
   const net = (process.env.NEXT_PUBLIC_NETWORK ?? "mainnet").toLowerCase();
@@ -25,7 +33,7 @@ function networkPrefix(): "lnbc" | "lntb" {
 export function mockCreateInvoice(req: InvoiceRequest): Invoice {
   const paymentHash = createHash("sha256").update(randomBytes(32)).digest("hex");
   const invoiceId = `mock_${paymentHash.slice(0, 24)}`;
-  mockInvoices.set(invoiceId, "pending");
+  mockInvoices().set(invoiceId, "pending");
 
   return {
     invoiceId,
@@ -46,7 +54,7 @@ function invoiceIdFromVerifyUrl(verifyUrl: string): string {
 }
 
 export function mockVerify(verifyUrl: string): VerifyResult {
-  const state = mockInvoices.get(invoiceIdFromVerifyUrl(verifyUrl));
+  const state = mockInvoices().get(invoiceIdFromVerifyUrl(verifyUrl));
   if (state === "settled") return { state: "settled", preimage: "mock", mock: true };
   if (state === "failed") return { state: "failed", reason: "mock invoice failed", mock: true };
   if (!state) return { state: "failed", reason: "unknown mock invoice", mock: true };
@@ -55,17 +63,19 @@ export function mockVerify(verifyUrl: string): VerifyResult {
 
 /** Dev-only settle. Returns false when the invoice is unknown or already resolved. */
 export function mockSettle(invoiceId: string): boolean {
-  if (mockInvoices.get(invoiceId) !== "pending") return false;
-  mockInvoices.set(invoiceId, "settled");
+  const registry = mockInvoices();
+  if (registry.get(invoiceId) !== "pending") return false;
+  registry.set(invoiceId, "settled");
   return true;
 }
 
 export function mockFail(invoiceId: string): boolean {
-  if (mockInvoices.get(invoiceId) !== "pending") return false;
-  mockInvoices.set(invoiceId, "failed");
+  const registry = mockInvoices();
+  if (registry.get(invoiceId) !== "pending") return false;
+  registry.set(invoiceId, "failed");
   return true;
 }
 
 export function mockReset(): void {
-  mockInvoices.clear();
+  resetGlobalSingleton(REGISTRY_KEY);
 }

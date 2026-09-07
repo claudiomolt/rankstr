@@ -15,6 +15,7 @@ import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { bids, listings, takeovers } from "@/db/schema";
 import { normalizeCategory } from "@/lib/categories";
+import { globalSingleton, resetGlobalSingleton } from "@/lib/global-singleton";
 import type { IdentityType } from "@/lib/identity";
 import type { Listing, ListingStatus } from "@/lib/rankings";
 import { seedListings } from "@/lib/seed";
@@ -84,17 +85,32 @@ export function newId(): string {
 
 type MemoryListing = Listing & { updatedAt: string };
 
-const memListings = new Map<string, MemoryListing>();
-const memBids = new Map<string, BidRecord>();
-const memTakeovers = new Map<string, Takeover & { bidId: string }>();
-let memSeeded = false;
+type MemoryState = {
+  listings: Map<string, MemoryListing>;
+  bids: Map<string, BidRecord>;
+  takeovers: Map<string, Takeover & { bidId: string }>;
+  seeded: boolean;
+};
 
-function ensureSeeded(): void {
-  if (memSeeded) return;
-  memSeeded = true;
+const MEMORY_KEY = "memory-store";
+
+function memory(): MemoryState {
+  return globalSingleton<MemoryState>(MEMORY_KEY, () => ({
+    listings: new Map(),
+    bids: new Map(),
+    takeovers: new Map(),
+    seeded: false,
+  }));
+}
+
+function ensureSeeded(): MemoryState {
+  const state = memory();
+  if (state.seeded) return state;
+  state.seeded = true;
   for (const listing of seedListings) {
-    memListings.set(listing.id, { ...listing, updatedAt: listing.createdAt });
+    state.listings.set(listing.id, { ...listing, updatedAt: listing.createdAt });
   }
+  return state;
 }
 
 function cloneListing(listing: MemoryListing): Listing {
@@ -105,34 +121,29 @@ function cloneListing(listing: MemoryListing): Listing {
 
 /** Reset process state. Test helper — never called by the app. */
 export function resetMemoryStore(): void {
-  memListings.clear();
-  memBids.clear();
-  memTakeovers.clear();
-  memSeeded = false;
+  resetGlobalSingleton(MEMORY_KEY);
 }
 
 const memoryStore: Store = {
   async listPublic() {
-    ensureSeeded();
-    return [...memListings.values()].filter((l) => l.cumulativeSats > 0).map(cloneListing);
+    const state = ensureSeeded();
+    return [...state.listings.values()].filter((l) => l.cumulativeSats > 0).map(cloneListing);
   },
 
   async getListing(id) {
-    ensureSeeded();
-    const found = memListings.get(id);
+    const found = ensureSeeded().listings.get(id);
     return found ? cloneListing(found) : null;
   },
 
   async getListingByIdentity(identityKey) {
-    ensureSeeded();
-    for (const listing of memListings.values()) {
+    for (const listing of ensureSeeded().listings.values()) {
       if (listing.identityKey === identityKey) return cloneListing(listing);
     }
     return null;
   },
 
   async createListing(draft) {
-    ensureSeeded();
+    const state = ensureSeeded();
     const now = new Date().toISOString();
     const listing: MemoryListing = {
       id: newId(),
@@ -149,7 +160,7 @@ const memoryStore: Store = {
       updatedAt: now,
       status: "open",
     };
-    memListings.set(listing.id, listing);
+    state.listings.set(listing.id, listing);
     return cloneListing(listing);
   },
 
@@ -160,78 +171,72 @@ const memoryStore: Store = {
       createdAt: new Date().toISOString(),
       settledAt: null,
     };
-    memBids.set(record.id, record);
+    memory().bids.set(record.id, record);
     return record;
   },
 
   async getBid(bidId) {
-    const found = memBids.get(bidId);
+    const found = memory().bids.get(bidId);
     return found ? { ...found } : null;
   },
 
   async setBidStatus(bidId, status) {
-    const found = memBids.get(bidId);
+    const found = memory().bids.get(bidId);
     if (!found) return null;
     found.status = status;
     found.settledAt = status === "paid" ? new Date().toISOString() : found.settledAt;
-    memBids.set(bidId, found);
     return { ...found };
   },
 
   async addSats(listingId, amountSats) {
-    ensureSeeded();
-    const found = memListings.get(listingId);
+    const found = ensureSeeded().listings.get(listingId);
     if (!found) return null;
     found.cumulativeSats += amountSats;
     found.status = "climbing";
     found.updatedAt = new Date().toISOString();
-    memListings.set(listingId, found);
     return cloneListing(found);
   },
 
   async recordClick(listingId) {
-    ensureSeeded();
-    const found = memListings.get(listingId);
+    const found = ensureSeeded().listings.get(listingId);
     if (!found || found.cumulativeSats <= 0) return null;
     found.clickCount += 1;
-    memListings.set(listingId, found);
     return cloneListing(found);
   },
 
   async listTakeovers() {
-    return [...memTakeovers.values()].map(({ bidId: _bidId, ...t }) => {
+    return [...memory().takeovers.values()].map(({ bidId: _bidId, ...t }) => {
       void _bidId;
       return { ...t };
     });
   },
 
   async putTakeover(takeover) {
-    memTakeovers.set(takeover.id, { ...takeover });
+    memory().takeovers.set(takeover.id, { ...takeover });
     const { bidId: _bidId, ...rest } = takeover;
     void _bidId;
     return { ...rest };
   },
 
   async setTakeoverStatus(id, status) {
-    const found = memTakeovers.get(id);
+    const found = memory().takeovers.get(id);
     if (!found) return null;
     found.status = status;
-    memTakeovers.set(id, found);
     const { bidId: _bidId, ...rest } = found;
     void _bidId;
     return { ...rest };
   },
 
   async recentActivity(limit) {
-    ensureSeeded();
-    return [...memBids.values()]
+    const state = ensureSeeded();
+    return [...state.bids.values()]
       .filter((b): b is BidRecord & { settledAt: string } => b.status === "paid" && b.settledAt !== null)
       .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime())
       .slice(0, limit)
       .map((b) => ({
         bidId: b.id,
         listingId: b.listingId,
-        listingTitle: memListings.get(b.listingId)?.title ?? "listing",
+        listingTitle: state.listings.get(b.listingId)?.title ?? "listing",
         kind: b.kind,
         amountSats: b.amountSats,
         targetCumulativeSats: b.targetCumulativeSats,
