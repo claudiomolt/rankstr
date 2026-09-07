@@ -35,6 +35,7 @@ const preset: Partial<Config> = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // brand aliases
         vermilion: "hsl(var(--primary))",
         brass: "hsl(var(--accent))",
       },

@@ -29,20 +29,20 @@ themes:
       danger: "#FF4533"
   light:
     surfaces:
-      void: "#F4EFE6"
-      basalt: "#EBE4D8"
-      plate: "#FFFFFF"
+      void: "#F4EFE6"      # bone paper
+      basalt: "#EBE4D8"    # soft plate ground
+      plate: "#FFFFFF"     # cards
       elevated: "#FFFFFF"
       rule: "#D2C8B6"
     ink:
-      chalk: "#181613"
+      chalk: "#181613"     # basalt as ink
       muted: "#6B645A"
       faint: "#9A9184"
     accents:
-      vermilion: "#E03A2A"
-      brass: "#A67F12"
+      vermilion: "#E03A2A" # same hue, deeper for contrast on bone
+      brass: "#A67F12"     # readable brass on light
       brass_fill: "#F2C94C"
-      frost: "#4F6F7C"
+      frost: "#4F6F7C"     # cooler info on light
       danger: "#E03A2A"
 naming:
   wordmark: lowercase
