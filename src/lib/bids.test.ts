@@ -74,6 +74,15 @@ describe("creating a bid", () => {
     );
   });
 
+  it("leaves no listing behind when the submission is rejected", async () => {
+    const store = getStore();
+    const before = (await store.listPublic()).length;
+
+    await expect(createBid({ identity: "https://ghost.example", bidSats: 999 })).rejects.toThrow();
+    expect(await store.getListingByIdentity("url:ghost.example")).toBeNull();
+    expect(await store.listPublic()).toHaveLength(before);
+  });
+
   it("rejects identities the board does not accept", async () => {
     await expect(createBid({ identity: "https://t.me/group", bidSats: 5000 })).rejects.toThrow(
       /Chat and invite links/,
@@ -208,6 +217,9 @@ describe("takeover", () => {
     const quote = await getBoardQuote();
     expect(quote.takeoverAvailable).toBe(false);
     expect(quote.takeoverActiveUntil).toBeDefined();
+
+    // The blocked attempt must not leave an unpaid listing behind either.
+    expect(await getStore().getListingByIdentity("url:louder.example")).toBeNull();
   });
 });
 

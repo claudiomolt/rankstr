@@ -122,19 +122,31 @@ export async function createBid(
 ): Promise<CreateBidResult> {
   const store = getStore();
   const kind: BidKind = input.kind ?? "bid";
-  const { listing } = await resolveListing(input, redirectResolver);
   const board = sortListings(await store.listPublic());
+
+  // Validate before touching the listing, so a rejected submission never leaves
+  // an orphan unpaid row behind.
+  let requestedBid = 0;
+  let takeoverCost = 0;
+
+  if (kind === "takeover") {
+    const eligibility = canStartTakeover(await store.listTakeovers(), board);
+    if (!eligibility.ok) throw new BidError(409, eligibility.reason);
+    takeoverCost = eligibility.costSats;
+  } else {
+    requestedBid = requireWholeBid(input.bidSats);
+  }
+
+  const { listing } = await resolveListing(input, redirectResolver);
 
   let amountSats: number;
   let bidSats: number;
 
   if (kind === "takeover") {
-    const eligibility = canStartTakeover(await store.listTakeovers(), board);
-    if (!eligibility.ok) throw new BidError(409, eligibility.reason);
-    amountSats = eligibility.costSats;
+    amountSats = takeoverCost;
     bidSats = listing.cumulativeSats + amountSats;
   } else {
-    bidSats = requireWholeBid(input.bidSats);
+    bidSats = requestedBid;
     const delta = raiseDeltaSats(listing.cumulativeSats, bidSats);
     if (delta === null) {
       throw new BidError(
