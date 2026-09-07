@@ -1,0 +1,53 @@
+brand_id: rankstr
+display_name: rankstr
+domain: rankstr.io
+status: ready-for-dev
+updated: "2026-09-07"
+direction: "Basalt / vermilion / brass (Precision Instrument / Signal Rail)"
+source: "options/model-gpt-cursor — Agustin pick 2026-09-07"
+gate: Agustin last-yes DEV 2026-09-07 — Canva/vault canonical still gated
+type:
+  display: "Saira Condensed"
+  body: "Public Sans"
+  mono: "IBM Plex Mono"
+themes:
+  dark:
+    surfaces:
+      void: "#0D0C0B"
+      basalt: "#181613"
+      plate: "#24211D"
+      elevated: "#2C2823"
+      rule: "#3B3630"
+    ink:
+      chalk: "#F2EEE4"
+      muted: "#AAA298"
+      faint: "#6F695F"
+    accents:
+      vermilion: "#FF4533"
+      brass: "#F2C94C"
+      frost: "#B9DCE8"
+      danger: "#FF4533"
+  light:
+    surfaces:
+      void: "#F4EFE6"
+      basalt: "#EBE4D8"
+      plate: "#FFFFFF"
+      elevated: "#FFFFFF"
+      rule: "#D2C8B6"
+    ink:
+      chalk: "#181613"
+      muted: "#6B645A"
+      faint: "#9A9184"
+    accents:
+      vermilion: "#E03A2A"
+      brass: "#A67F12"
+      brass_fill: "#F2C94C"
+      frost: "#4F6F7C"
+      danger: "#E03A2A"
+naming:
+  wordmark: lowercase
+  bitcoin_only: true
+do_not_reuse:
+  - "La Crypta #FF5238 #FF4BB9 #4300AE #B3F950"
+  - "LaWallet #fdc800 #00836d #0a0a0f #00a98c"
+  - "VEINTIUNO #F7931A as brand fill"
