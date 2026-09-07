@@ -35,3 +35,15 @@ Provider: hosted LSP / Voltage-style thin REST adapter (`src/lib/ln/lsp.ts`) —
 Raise mechanic: invoice amount = delta to exceed current cumulative; result ≥ `MIN_BID_SATS` (1000). On paid webhook → bump `cumulative_sats`.
 
 `NEXT_PUBLIC_NETWORK=mainnet` for live.
+
+## Nostr read (P4)
+
+Optional soft profile enrichment for listings that include an **npub** (read-only).
+
+- Lib: `src/lib/nostr/` — decode npub → hex pubkey; fetch kind 0 metadata (display name + picture).
+- API: `GET /api/nostr/profile?npub=` (short cache TTL). Server-side so browsers do not hit relays directly.
+- **Fail soft**: relay/timeout/invalid npub → board still shows truncated npub; never blocks board or bid. No NIP-07 login, no signing, no spend.
+- Env: `NOSTR_RELAYS` comma list. When unset, defaults:
+  - `wss://relay.damus.io`
+  - `wss://nos.lol`
+  - `wss://relay.nostr.band`
