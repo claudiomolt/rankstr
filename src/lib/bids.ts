@@ -11,11 +11,16 @@ import {
 import {
   memoryGetListing,
   memoryGetListings,
+  memoryGetPending,
   memoryMarkPaid,
   memoryPutPending,
   memoryUpsertListing,
   type PendingBid,
 } from "@/lib/memory-store";
+import { stripTrackingParams } from "@/lib/utils";
+import { resolvePaidSettle } from "@/lib/bid-settle";
+
+export { applyPaidBid, resolvePaidSettle } from "@/lib/bid-settle";
 
 export type CreateBidInput = {
   listingId?: string;
@@ -106,7 +111,7 @@ export async function createBid(input: CreateBidInput): Promise<CreateBidResult>
     currentCumulative = 0;
     newListingDraft = {
       title: input.title.trim(),
-      url: input.url?.trim() || undefined,
+      url: stripTrackingParams(input.url?.trim()) || undefined,
       npub: input.npub?.trim() || undefined,
     };
   }
@@ -193,31 +198,41 @@ export async function settleInvoicePaid(invoiceId: string): Promise<{
       .limit(1);
     const bid = bidRows[0];
     if (!bid) return { ok: false, reason: "bid not found" };
-    if (bid.status === "paid") {
-      const listingRows = await db
-        .select()
-        .from(listings)
-        .where(eq(listings.id, bid.listingId))
-        .limit(1);
-      return {
-        ok: true,
-        listingId: bid.listingId,
-        cumulativeSats: listingRows[0]?.cumulativeSats ?? 0,
-      };
-    }
-    if (bid.status !== "pending") {
-      return { ok: false, reason: `bid status is ${bid.status}` };
-    }
 
     const listingRows = await db
       .select()
       .from(listings)
       .where(eq(listings.id, bid.listingId))
       .limit(1);
-    const listing = listingRows[0];
-    if (!listing) return { ok: false, reason: "listing not found" };
+    const listingRow = listingRows[0];
+    const listingForSettle: Listing | null = listingRow
+      ? {
+          id: listingRow.id,
+          title: listingRow.title,
+          url: listingRow.url ?? undefined,
+          npub: listingRow.npub ?? undefined,
+          cumulativeSats: listingRow.cumulativeSats,
+          createdAt: listingRow.createdAt.toISOString(),
+          status: listingRow.status,
+        }
+      : null;
 
-    const nextCumulative = listing.cumulativeSats + bid.amountSats;
+    const outcome = resolvePaidSettle({
+      bidStatus: bid.status,
+      listingId: bid.listingId,
+      amountSats: bid.amountSats,
+      listing: listingForSettle,
+    });
+    if (!outcome.ok) return outcome;
+    if (outcome.alreadyPaid) {
+      return {
+        ok: true,
+        listingId: outcome.listingId,
+        cumulativeSats: outcome.cumulativeSats,
+      };
+    }
+
+    const nextCumulative = outcome.cumulativeSats;
     await db
       .update(bids)
       .set({ status: "paid" })
@@ -229,13 +244,13 @@ export async function settleInvoicePaid(invoiceId: string): Promise<{
         updatedAt: new Date(),
         status: "climbing",
       })
-      .where(eq(listings.id, listing.id));
+      .where(eq(listings.id, bid.listingId));
 
-    return { ok: true, listingId: listing.id, cumulativeSats: nextCumulative };
+    return { ok: true, listingId: bid.listingId, cumulativeSats: nextCumulative };
   }
 
-  const pending = memoryMarkPaid(invoiceId);
-  if (!pending) {
+  const pending = memoryGetPending(invoiceId);
+  if (!pending || pending.status !== "pending") {
     return { ok: false, reason: "pending bid not found or already settled" };
   }
 
@@ -251,18 +266,30 @@ export async function settleInvoicePaid(invoiceId: string): Promise<{
       status: "open",
     };
   }
-  if (!listing) {
-    return { ok: false, reason: "listing not found" };
+
+  const outcome = resolvePaidSettle({
+    bidStatus: pending.status,
+    listingId: pending.listingId,
+    amountSats: pending.amountSats,
+    listing: listing ?? null,
+  });
+  if (!outcome.ok) return outcome;
+
+  const marked = memoryMarkPaid(invoiceId);
+  if (!marked) {
+    return { ok: false, reason: "pending bid not found or already settled" };
   }
 
-  const nextCumulative = listing.cumulativeSats + pending.amountSats;
-  memoryUpsertListing({
-    ...listing,
-    cumulativeSats: nextCumulative,
-    status: "climbing",
-  });
+  if (!outcome.listing) {
+    return { ok: false, reason: "listing not found" };
+  }
+  memoryUpsertListing(outcome.listing);
 
-  return { ok: true, listingId: listing.id, cumulativeSats: nextCumulative };
+  return {
+    ok: true,
+    listingId: outcome.listingId,
+    cumulativeSats: outcome.cumulativeSats,
+  };
 }
 
 export function listBoardForClient(): Listing[] {
