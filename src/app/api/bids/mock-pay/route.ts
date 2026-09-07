@@ -1,42 +1,43 @@
 import { NextResponse } from "next/server";
-import { settleInvoicePaid } from "@/lib/bids";
-import { isMockMode } from "@/lib/ln";
+import { BidError, settleBid } from "@/lib/bids";
+import { isMockMode, mockSettle } from "@/lib/ln";
 
 export const runtime = "nodejs";
 
 /**
- * Dev helper: mark a mock invoice paid.
- * Only available when LN_LSP_BASE_URL / LN_LSP_API_KEY are absent (mock mode).
- * Never exposed when live LSP is configured.
+ * Dev-only settle for the mock rail. Available only when LN_ADDRESS is unset,
+ * so a configured board can never be advanced without a real payment.
  */
 export async function POST(request: Request) {
   if (!isMockMode()) {
     return NextResponse.json(
-      { error: "mock-pay disabled when live LSP is configured" },
+      { error: "Mock pay is disabled: LN_ADDRESS is configured." },
       { status: 403 },
     );
   }
 
   try {
-    const body = (await request.json()) as { invoiceId?: string };
-    const invoiceId = body.invoiceId?.trim();
-    if (!invoiceId) {
-      return NextResponse.json({ error: "invoiceId required" }, { status: 400 });
+    const body = (await request.json()) as { bidId?: string; mockInvoiceId?: string };
+    const bidId = body.bidId?.trim();
+    const mockInvoiceId = body.mockInvoiceId?.trim();
+    if (!bidId || !mockInvoiceId) {
+      return NextResponse.json({ error: "bidId and mockInvoiceId are required" }, { status: 400 });
     }
 
-    const result = await settleInvoicePaid(invoiceId);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.reason }, { status: 404 });
+    if (!mockSettle(mockInvoiceId)) {
+      return NextResponse.json(
+        { error: "That mock invoice is unknown or already resolved." },
+        { status: 409 },
+      );
     }
 
-    return NextResponse.json({
-      ok: true,
-      mock: true,
-      listingId: result.listingId,
-      cumulativeSats: result.cumulativeSats,
-    });
+    const result = await settleBid(bidId);
+    return NextResponse.json({ ...result, mock: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
+    if (err instanceof BidError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error("POST /api/bids/mock-pay", err);
-    return NextResponse.json({ error: "mock-pay failed" }, { status: 500 });
+    return NextResponse.json({ error: "Mock pay failed." }, { status: 500 });
   }
 }

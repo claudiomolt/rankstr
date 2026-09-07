@@ -1,37 +1,59 @@
 import type { Listing } from "./rankings";
 
-/** Seed board data for P0–P2 UI — not live traction. */
+/**
+ * Seed board data for local development and the no-database fallback.
+ *
+ * Not live traction and not a metric. `identityKey` values match exactly what
+ * `normalizeIdentity` produces for the same input, so submitting one of these
+ * URLs again resolves to the existing row and behaves as a raise.
+ */
 export const seedListings: Listing[] = [
   {
-    id: "1",
+    id: "seed-lawallet",
     title: "LaWallet NWC",
+    identityKey: "url:lawallet.io",
+    identityType: "url",
     url: "https://lawallet.io",
+    categorySlug: "wallets",
     cumulativeSats: 21000,
+    clickCount: 0,
     createdAt: "2026-08-01T12:00:00.000Z",
     status: "live",
   },
   {
-    id: "2",
+    id: "seed-rankstr",
     title: "rankstr (self)",
+    identityKey: "url:rankstr.io",
+    identityType: "url",
     url: "https://rankstr.io",
-    npub: "npub1rankstrexample000000000000000000000000000000000000",
+    npub: "npub18fgzegkpe2efl54xs4jcfvhfjetf30k9chzfvkn346tpwsrhrp3ssju3rs",
+    categorySlug: "other",
     cumulativeSats: 10000,
+    clickCount: 0,
     createdAt: "2026-08-15T12:00:00.000Z",
     status: "climbing",
   },
   {
-    id: "3",
+    id: "seed-nostr-starter",
     title: "Nostr starter",
-    npub: "npub1nostrstarterexample0000000000000000000000000000000",
+    identityKey: "npub:npub168wdr7r7z8q9lndcrulyhxnt95tsczt54qynmvn59q9hp32snjuqhth55f",
+    identityType: "npub",
+    npub: "npub168wdr7r7z8q9lndcrulyhxnt95tsczt54qynmvn59q9hp32snjuqhth55f",
+    categorySlug: "nostr",
     cumulativeSats: 10000,
+    clickCount: 0,
     createdAt: "2026-07-01T12:00:00.000Z",
     status: "open",
   },
   {
-    id: "4",
+    id: "seed-lightning-domain",
     title: "Lightning Domain",
+    identityKey: "url:github.com/lawalletio/lightning-domain",
+    identityType: "url",
     url: "https://github.com/lawalletio/lightning-domain",
+    categorySlug: "dev-tools",
     cumulativeSats: 3500,
+    clickCount: 0,
     createdAt: "2026-09-01T12:00:00.000Z",
     status: "open",
   },
