@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MIN_BID_SATS, raiseDeltaSats, type Listing } from "@/lib/rankings";
 import { formatSats } from "@/lib/utils";
+import { truncateNpub } from "@/lib/nostr";
 import { createElement } from "react";
 
 type Mode = "create" | "raise";
@@ -25,6 +26,14 @@ type InvoicePayload = {
 
 function Msg(props: { className: string; text: string }) {
   return createElement("p", { className: props.className }, props.text);
+}
+
+function listingOptionLabel(l: Listing): string {
+  const base = l.title + " — " + formatSats(l.cumulativeSats);
+  if (l.npub?.trim()) {
+    return base + " · " + truncateNpub(l.npub.trim());
+  }
+  return base;
 }
 
 export function BidForm({ listings }: { listings: Listing[] }) {
@@ -175,7 +184,7 @@ export function BidForm({ listings }: { listings: Listing[] }) {
             >
               {listings.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.title + " — " + formatSats(l.cumulativeSats)}
+                  {listingOptionLabel(l)}
                 </option>
               ))}
             </select>
