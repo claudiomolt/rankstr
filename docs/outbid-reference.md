@@ -15,7 +15,7 @@ Public pay-to-rank leaderboard: submit URL o X @handle + bid; **rank = bid**, si
 - Claim #1: bid por encima del leader (reglas publicadas: ≥ +$1 o +$5 según fuente; equal bids → orden de llegada, el más viejo queda arriba)
 - Categories (fuente microsaas): boards por categoría además del main
 - Post-pay: listing público; clicks al URL/profile sin query params
-- Payment rail del original: **Stripe / fiat** (no Lightning)
+- Payment rail del original: card settlement (no Lightning) — rankstr is sats/Lightning only
 - Rules extras citadas: no chat/invite links; no NSFW; no shorteners (se resuelve redirect); App Store/Play/GitHub keyed by path; takeover 2× #1 lockea first page 3h (una a la vez)
 - Pitch: no ads, no API keys, no revenue share — pagás para estar arriba
 

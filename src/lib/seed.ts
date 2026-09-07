@@ -57,7 +57,7 @@ export const curatedActiveIndex: ActiveEntry[] = [
     id: "a2",
     label: "outbid.lol (reference)",
     url: "https://outbid.lol",
-    note: "Curated seed — mechanic reference (fiat original)",
+    note: "Curated seed — pay-to-rank mechanic reference (Lightning-only here)",
   },
   {
     id: "a3",

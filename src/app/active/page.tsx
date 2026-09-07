@@ -1,4 +1,5 @@
 import { curatedActiveIndex } from "@/lib/seed";
+import { stripTrackingParams } from "@/lib/utils";
 
 export default function ActiveIndexPage() {
   return (
@@ -18,8 +19,8 @@ export default function ActiveIndexPage() {
           >
             <div className="font-semibold">{entry.label}</div>
             {entry.url ? (
-              <a className="font-mono text-xs text-[color:var(--rs-frost)] underline-offset-2 hover:underline" href={entry.url} rel="noreferrer">
-                {entry.url}
+              <a className="font-mono text-xs text-[color:var(--rs-frost)] underline-offset-2 hover:underline" href={stripTrackingParams(entry.url)} rel="noreferrer">
+                {stripTrackingParams(entry.url)}
               </a>
             ) : null}
             <p className="mt-1 text-sm text-muted-foreground">{entry.note}</p>
