@@ -1,60 +1,46 @@
-import type { Listing } from "@/lib/rankings";
-
-/** Pure settle math: bump cumulative and mark listing climbing. */
-export function applyPaidBid<T extends { cumulativeSats: number; status: Listing["status"] }>(
-  listing: T,
-  amountSats: number,
-): T {
-  return {
-    ...listing,
-    cumulativeSats: listing.cumulativeSats + amountSats,
-    status: "climbing",
-  };
-}
-
-export type SettleBidSnapshot = {
-  bidStatus: string;
-  listingId: string;
-  amountSats: number;
-  listing: Listing | null;
-};
-
-export type SettleBidOutcome =
-  | {
-      ok: true;
-      alreadyPaid: boolean;
-      listingId: string;
-      cumulativeSats: number;
-      listing: Listing | null;
-    }
-  | { ok: false; reason: string };
+import type { VerifyResult } from "@/lib/ln/types";
+import type { BidStatus } from "@/lib/store";
 
 /**
- * Pure decision tree for paid webhook / mock-pay settle.
- * Callers persist side effects; this keeps behavior identical without I/O.
+ * Pure decision layer between an LUD21 verify result and a database write.
+ *
+ * Keeping this separate from the store means the settle rules — a completed
+ * payment claims the rank, and only once — are testable without a node, a
+ * network, or a database.
  */
-export function resolvePaidSettle(input: SettleBidSnapshot): SettleBidOutcome {
+
+export type SettleDecision =
+  | { action: "settle"; nextCumulative: number }
+  | { action: "already-settled"; nextCumulative: number }
+  | { action: "wait"; reason?: string }
+  | { action: "fail"; reason: string };
+
+export type SettleInput = {
+  bidStatus: BidStatus;
+  verify: VerifyResult;
+  listingCumulative: number;
+  amountSats: number;
+};
+
+export function decideSettlement(input: SettleInput): SettleDecision {
   if (input.bidStatus === "paid") {
-    return {
-      ok: true,
-      alreadyPaid: true,
-      listingId: input.listingId,
-      cumulativeSats: input.listing?.cumulativeSats ?? 0,
-      listing: input.listing,
-    };
+    return { action: "already-settled", nextCumulative: input.listingCumulative };
   }
-  if (input.bidStatus !== "pending") {
-    return { ok: false, reason: `bid status is ${input.bidStatus}` };
+  if (input.bidStatus === "failed" || input.bidStatus === "expired") {
+    return { action: "fail", reason: `bid is ${input.bidStatus}` };
   }
-  if (!input.listing) {
-    return { ok: false, reason: "listing not found" };
+
+  switch (input.verify.state) {
+    case "settled":
+      return { action: "settle", nextCumulative: input.listingCumulative + input.amountSats };
+    case "failed":
+      return { action: "fail", reason: input.verify.reason ?? "payment failed" };
+    default:
+      return { action: "wait", reason: input.verify.reason };
   }
-  const listing = applyPaidBid(input.listing, input.amountSats);
-  return {
-    ok: true,
-    alreadyPaid: false,
-    listingId: input.listingId,
-    cumulativeSats: listing.cumulativeSats,
-    listing,
-  };
+}
+
+/** Cumulative sats after a paid bid. A bid adds to the listing, it does not replace it. */
+export function applyPaidBid(currentCumulative: number, amountSats: number): number {
+  return currentCumulative + amountSats;
 }

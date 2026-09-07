@@ -1,54 +1,32 @@
-import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
-import { db, hasDatabase } from "@/db";
-import { bids, listings } from "@/db/schema";
-import { createInvoice, isMockMode } from "@/lib/ln";
+/**
+ * Bid orchestration: identity → listing → invoice → LUD21 settlement.
+ *
+ * Nothing here is public until a payment settles. Creating a bid only reserves
+ * an invoice; `settleBid` is the single place a rank can be claimed.
+ */
+
+import { normalizeCategory } from "@/lib/categories";
+import { decideSettlement } from "@/lib/bid-settle";
+import { resolveIdentity, type Identity, type RedirectResolver } from "@/lib/identity";
+import { checkInvoice, createInvoice, isMockMode } from "@/lib/ln";
 import {
+  BID_STEP_SATS,
   MIN_BID_SATS,
+  claimTopTargetSats,
+  isValidBidAmount,
+  projectedRank,
   raiseDeltaSats,
+  sortListings,
+  topBidSats,
   type Listing,
 } from "@/lib/rankings";
+import { getStore, newId, type BidKind, type BidRecord } from "@/lib/store";
 import {
-  memoryGetListing,
-  memoryGetListings,
-  memoryGetPending,
-  memoryMarkPaid,
-  memoryPutPending,
-  memoryUpsertListing,
-  type PendingBid,
-} from "@/lib/memory-store";
-import { stripTrackingParams } from "@/lib/utils";
-import { resolvePaidSettle } from "@/lib/bid-settle";
-
-export { applyPaidBid, resolvePaidSettle } from "@/lib/bid-settle";
-
-export type CreateBidInput = {
-  listingId?: string;
-  title?: string;
-  url?: string;
-  npub?: string;
-  targetCumulativeSats: number;
-};
-
-export type CreateBidResult = {
-  bidId: string;
-  listingId: string;
-  amountSats: number;
-  targetCumulativeSats: number;
-  invoice: {
-    invoiceId: string;
-    paymentRequest: string;
-    paymentHash: string;
-    expiresAt: string;
-    mock: boolean;
-  };
-};
-
-function requireUrlOrNpub(url?: string, npub?: string): void {
-  if (!url?.trim() && !npub?.trim()) {
-    throw new BidError(400, "At least one of url or npub is required");
-  }
-}
+  canStartTakeover,
+  takeoverCostSats,
+  takeoverWindow,
+  type Takeover,
+} from "@/lib/takeover";
 
 export class BidError extends Error {
   constructor(
@@ -60,243 +38,268 @@ export class BidError extends Error {
   }
 }
 
-async function resolveCurrentListing(
-  listingId: string | undefined,
-): Promise<Listing | null> {
-  if (!listingId) return null;
-  if (hasDatabase() && db) {
-    const rows = await db
-      .select()
-      .from(listings)
-      .where(eq(listings.id, listingId))
-      .limit(1);
-    const row = rows[0];
-    if (!row) return null;
-    return {
-      id: row.id,
-      title: row.title,
-      url: row.url ?? undefined,
-      npub: row.npub ?? undefined,
-      cumulativeSats: row.cumulativeSats,
-      createdAt: row.createdAt.toISOString(),
-      status: row.status,
-    };
+export type CreateBidInput = {
+  /** Raw submitted website, @handle, or npub. Omitted when raising by listingId. */
+  identity?: string;
+  /** Shortcut for raising an existing listing without retyping its identity. */
+  listingId?: string;
+  title?: string;
+  /** Optional Nostr enrichment, independent of the listing identity. */
+  npub?: string;
+  categorySlug?: string;
+  bidSats: number;
+  kind?: BidKind;
+};
+
+/** Everything the browser is allowed to see about a reserved bid. */
+export type CreateBidResult = {
+  bidId: string;
+  listingId: string;
+  kind: BidKind;
+  amountSats: number;
+  bidSats: number;
+  projectedRank: number;
+  invoice: {
+    paymentRequest: string;
+    expiresAt: string;
+    mock: boolean;
+  };
+  mockInvoiceId?: string;
+};
+
+function requireWholeBid(value: number): number {
+  const bid = Number(value);
+  if (!Number.isFinite(bid) || !Number.isInteger(bid)) {
+    throw new BidError(400, "Bids are whole sats.");
   }
-  return memoryGetListing(listingId) ?? null;
+  if (!isValidBidAmount(bid)) {
+    throw new BidError(400, `Minimum bid is ${MIN_BID_SATS} sats.`);
+  }
+  return bid;
 }
 
-export async function createBid(input: CreateBidInput): Promise<CreateBidResult> {
-  const target = Math.floor(Number(input.targetCumulativeSats));
-  if (!Number.isFinite(target)) {
-    throw new BidError(400, "targetCumulativeSats must be a number");
+async function resolveListing(
+  input: CreateBidInput,
+  redirectResolver?: RedirectResolver,
+): Promise<{ listing: Listing; identity?: Identity }> {
+  const store = getStore();
+
+  if (input.listingId) {
+    const listing = await store.getListing(input.listingId);
+    if (!listing) throw new BidError(404, "Listing not found.");
+    return { listing };
   }
 
-  const existing = await resolveCurrentListing(input.listingId);
-  let listingId: string;
-  let currentCumulative: number;
-  let newListingDraft: PendingBid["newListing"] | undefined;
+  if (!input.identity?.trim()) {
+    throw new BidError(400, "Enter a website, an X @handle, or an npub.");
+  }
 
-  if (existing) {
-    listingId = existing.id;
-    currentCumulative = existing.cumulativeSats;
+  const resolved = await resolveIdentity(input.identity, redirectResolver);
+  if (!resolved.ok) {
+    throw new BidError(400, resolved.message);
+  }
+  const identity = resolved.identity;
+
+  const existing = await store.getListingByIdentity(identity.key);
+  if (existing) return { listing: existing, identity };
+
+  const title = input.title?.trim() || identity.display;
+  const listing = await store.createListing({
+    title,
+    identityKey: identity.key,
+    identityType: identity.type,
+    url: identity.url,
+    handle: identity.handle,
+    npub: identity.npub ?? input.npub?.trim() ?? undefined,
+    categorySlug: normalizeCategory(input.categorySlug),
+  });
+  return { listing, identity };
+}
+
+export async function createBid(
+  input: CreateBidInput,
+  redirectResolver?: RedirectResolver,
+): Promise<CreateBidResult> {
+  const store = getStore();
+  const kind: BidKind = input.kind ?? "bid";
+  const board = sortListings(await store.listPublic());
+
+  // Validate before touching the listing, so a rejected submission never leaves
+  // an orphan unpaid row behind.
+  let requestedBid = 0;
+  let takeoverCost = 0;
+
+  if (kind === "takeover") {
+    const eligibility = canStartTakeover(await store.listTakeovers(), board);
+    if (!eligibility.ok) throw new BidError(409, eligibility.reason);
+    takeoverCost = eligibility.costSats;
   } else {
-    if (input.listingId) {
-      throw new BidError(404, "Listing not found");
-    }
-    requireUrlOrNpub(input.url, input.npub);
-    if (!input.title?.trim()) {
-      throw new BidError(400, "title is required for a new listing");
-    }
-    listingId = randomUUID();
-    currentCumulative = 0;
-    newListingDraft = {
-      title: input.title.trim(),
-      url: stripTrackingParams(input.url?.trim()) || undefined,
-      npub: input.npub?.trim() || undefined,
-    };
+    requestedBid = requireWholeBid(input.bidSats);
   }
 
-  const amountSats = raiseDeltaSats(currentCumulative, target);
-  if (amountSats == null) {
-    throw new BidError(
-      400,
-      `Invalid raise: target must exceed current cumulative (${currentCumulative}) and be ≥ ${MIN_BID_SATS} sats`,
-    );
+  const { listing } = await resolveListing(input, redirectResolver);
+
+  let amountSats: number;
+  let bidSats: number;
+
+  if (kind === "takeover") {
+    amountSats = takeoverCost;
+    bidSats = listing.cumulativeSats + amountSats;
+  } else {
+    bidSats = requestedBid;
+    const delta = raiseDeltaSats(listing.cumulativeSats, bidSats);
+    if (delta === null) {
+      throw new BidError(
+        400,
+        listing.cumulativeSats > 0
+          ? `That listing is already at ${listing.cumulativeSats} sats. Raise it by at least ${BID_STEP_SATS} sat.`
+          : `Minimum bid is ${MIN_BID_SATS} sats.`,
+      );
+    }
+    amountSats = delta;
   }
 
   const invoice = await createInvoice({
     amountSats,
-    memo: `rankstr bid ${listingId} → ${target} sats`,
-    metadata: { listingId, targetCumulativeSats: String(target) },
+    memo: `rankstr ${kind} · ${listing.title}`,
   });
 
-  const bidId = randomUUID();
-
-  if (hasDatabase() && db) {
-    if (!existing && newListingDraft) {
-      await db.insert(listings).values({
-        id: listingId,
-        title: newListingDraft.title,
-        url: newListingDraft.url ?? null,
-        npub: newListingDraft.npub ?? null,
-        cumulativeSats: 0,
-        status: "open",
-      });
-    }
-    await db.insert(bids).values({
-      id: bidId,
-      listingId,
-      amountSats,
-      invoiceId: invoice.invoiceId,
-      paymentHash: invoice.paymentHash || null,
-      status: "pending",
-    });
-  } else {
-    memoryPutPending({
-      id: bidId,
-      listingId,
-      amountSats,
-      invoiceId: invoice.invoiceId,
-      paymentHash: invoice.paymentHash || null,
-      paymentRequest: invoice.paymentRequest,
-      status: "pending",
-      targetCumulativeSats: target,
-      createdAt: new Date().toISOString(),
-      newListing: newListingDraft,
-    });
-  }
+  const bid = await store.putBid({
+    id: newId(),
+    listingId: listing.id,
+    kind,
+    amountSats,
+    targetCumulativeSats: bidSats,
+    invoiceId: invoice.invoiceId,
+    paymentRequest: invoice.paymentRequest,
+    verifyUrl: invoice.verifyUrl,
+  });
 
   return {
-    bidId,
-    listingId,
+    bidId: bid.id,
+    listingId: listing.id,
+    kind,
     amountSats,
-    targetCumulativeSats: target,
+    bidSats,
+    projectedRank: projectedRank(board, bidSats, listing.id, listing.createdAt),
     invoice: {
-      invoiceId: invoice.invoiceId,
       paymentRequest: invoice.paymentRequest,
-      paymentHash: invoice.paymentHash,
       expiresAt: invoice.expiresAt,
       mock: invoice.mock,
     },
+    // Mock mode has no wallet to pay with, so the dev settle button needs the id.
+    mockInvoiceId: invoice.mock ? invoice.invoiceId : undefined,
   };
 }
 
-export async function settleInvoicePaid(invoiceId: string): Promise<{
-  ok: true;
+export type SettleResult = {
+  state: "settled" | "pending" | "failed";
+  bidId: string;
   listingId: string;
   cumulativeSats: number;
-} | { ok: false; reason: string }> {
-  if (!invoiceId?.trim()) {
-    return { ok: false, reason: "invoiceId required" };
-  }
+  kind: BidKind;
+  reason?: string;
+  takeover?: Takeover;
+};
 
-  if (hasDatabase() && db) {
-    const bidRows = await db
-      .select()
-      .from(bids)
-      .where(eq(bids.invoiceId, invoiceId))
-      .limit(1);
-    const bid = bidRows[0];
-    if (!bid) return { ok: false, reason: "bid not found" };
+/**
+ * Check LUD21 verify once and, if the invoice settled, claim the rank.
+ * Safe to call repeatedly — an already-paid bid reports settled without
+ * double-counting sats.
+ */
+export async function settleBid(bidId: string): Promise<SettleResult> {
+  const store = getStore();
+  const bid = await store.getBid(bidId);
+  if (!bid) throw new BidError(404, "Bid not found.");
 
-    const listingRows = await db
-      .select()
-      .from(listings)
-      .where(eq(listings.id, bid.listingId))
-      .limit(1);
-    const listingRow = listingRows[0];
-    const listingForSettle: Listing | null = listingRow
-      ? {
-          id: listingRow.id,
-          title: listingRow.title,
-          url: listingRow.url ?? undefined,
-          npub: listingRow.npub ?? undefined,
-          cumulativeSats: listingRow.cumulativeSats,
-          createdAt: listingRow.createdAt.toISOString(),
-          status: listingRow.status,
-        }
-      : null;
+  const listing = await store.getListing(bid.listingId);
+  if (!listing) throw new BidError(404, "Listing not found.");
 
-    const outcome = resolvePaidSettle({
-      bidStatus: bid.status,
-      listingId: bid.listingId,
-      amountSats: bid.amountSats,
-      listing: listingForSettle,
-    });
-    if (!outcome.ok) return outcome;
-    if (outcome.alreadyPaid) {
-      return {
-        ok: true,
-        listingId: outcome.listingId,
-        cumulativeSats: outcome.cumulativeSats,
-      };
+  const verify = bid.status === "pending" ? await checkInvoice(bid.verifyUrl) : { state: "pending" as const };
+  const decision = decideSettlement({
+    bidStatus: bid.status,
+    verify,
+    listingCumulative: listing.cumulativeSats,
+    amountSats: bid.amountSats,
+  });
+
+  const base = { bidId: bid.id, listingId: bid.listingId, kind: bid.kind };
+
+  switch (decision.action) {
+    case "already-settled":
+      return { ...base, state: "settled", cumulativeSats: decision.nextCumulative };
+
+    case "fail": {
+      if (bid.status === "pending") await store.setBidStatus(bid.id, "failed");
+      return { ...base, state: "failed", cumulativeSats: listing.cumulativeSats, reason: decision.reason };
     }
 
-    const nextCumulative = outcome.cumulativeSats;
-    await db
-      .update(bids)
-      .set({ status: "paid" })
-      .where(eq(bids.id, bid.id));
-    await db
-      .update(listings)
-      .set({
-        cumulativeSats: nextCumulative,
-        updatedAt: new Date(),
-        status: "climbing",
-      })
-      .where(eq(listings.id, bid.listingId));
+    case "wait":
+      return { ...base, state: "pending", cumulativeSats: listing.cumulativeSats, reason: decision.reason };
 
-    return { ok: true, listingId: bid.listingId, cumulativeSats: nextCumulative };
+    case "settle": {
+      const claimed = await store.setBidStatus(bid.id, "paid");
+      // Another request won the race and already applied the sats.
+      if (!claimed || claimed.settledAt === null || claimed.status !== "paid") {
+        const current = await store.getListing(bid.listingId);
+        return { ...base, state: "settled", cumulativeSats: current?.cumulativeSats ?? listing.cumulativeSats };
+      }
+
+      const updated = await store.addSats(bid.listingId, bid.amountSats);
+      const cumulativeSats = updated?.cumulativeSats ?? decision.nextCumulative;
+
+      let takeover: Takeover | undefined;
+      if (bid.kind === "takeover") {
+        takeover = await startTakeover(bid, cumulativeSats);
+      }
+
+      return { ...base, state: "settled", cumulativeSats, takeover };
+    }
   }
-
-  const pending = memoryGetPending(invoiceId);
-  if (!pending || pending.status !== "pending") {
-    return { ok: false, reason: "pending bid not found or already settled" };
-  }
-
-  let listing = memoryGetListing(pending.listingId);
-  if (!listing && pending.newListing) {
-    listing = {
-      id: pending.listingId,
-      title: pending.newListing.title,
-      url: pending.newListing.url,
-      npub: pending.newListing.npub,
-      cumulativeSats: 0,
-      createdAt: pending.createdAt,
-      status: "open",
-    };
-  }
-
-  const outcome = resolvePaidSettle({
-    bidStatus: pending.status,
-    listingId: pending.listingId,
-    amountSats: pending.amountSats,
-    listing: listing ?? null,
-  });
-  if (!outcome.ok) return outcome;
-
-  const marked = memoryMarkPaid(invoiceId);
-  if (!marked) {
-    return { ok: false, reason: "pending bid not found or already settled" };
-  }
-
-  if (!outcome.listing) {
-    return { ok: false, reason: "listing not found" };
-  }
-  memoryUpsertListing(outcome.listing);
-
-  return {
-    ok: true,
-    listingId: outcome.listingId,
-    cumulativeSats: outcome.cumulativeSats,
-  };
 }
 
-export function listBoardForClient(): Listing[] {
-  if (hasDatabase()) {
-    return [];
-  }
-  return memoryGetListings();
+async function startTakeover(bid: BidRecord, _cumulativeSats: number): Promise<Takeover | undefined> {
+  void _cumulativeSats;
+  const store = getStore();
+  const board = sortListings(await store.listPublic());
+  const eligibility = canStartTakeover(await store.listTakeovers(), board);
+  if (!eligibility.ok) return undefined;
+
+  const window = takeoverWindow(new Date());
+  return store.putTakeover({
+    id: newId(),
+    listingId: bid.listingId,
+    bidId: bid.id,
+    amountSats: bid.amountSats,
+    startsAt: window.startsAt,
+    endsAt: window.endsAt,
+    status: "active",
+  });
+}
+
+/** Board-facing quote so the bid form can show costs before anyone pays. */
+export async function getBoardQuote(): Promise<{
+  topBidSats: number;
+  claimTopSats: number;
+  takeoverCostSats: number;
+  takeoverAvailable: boolean;
+  takeoverActiveUntil?: string;
+  minBidSats: number;
+  mock: boolean;
+}> {
+  const store = getStore();
+  const board = sortListings(await store.listPublic());
+  const eligibility = canStartTakeover(await store.listTakeovers(), board);
+
+  return {
+    topBidSats: topBidSats(board),
+    claimTopSats: claimTopTargetSats(board),
+    takeoverCostSats: takeoverCostSats(board),
+    takeoverAvailable: eligibility.ok,
+    takeoverActiveUntil: eligibility.ok ? undefined : eligibility.activeUntil,
+    minBidSats: MIN_BID_SATS,
+    mock: isMockMode(),
+  };
 }
 
 export { isMockMode };

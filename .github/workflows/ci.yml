@@ -14,6 +14,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
+      # No LN_ADDRESS or DATABASE_URL: the build must succeed on the mock rail
+      # and the in-process store, which is also how a clean checkout runs.
+      - run: npm run build

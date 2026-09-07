@@ -1,6 +1,6 @@
 /**
- * Seed Postgres from existing UI seed data.
- * Usage: DATABASE_URL=... npx tsx src/db/seed.ts
+ * Seed Postgres from the shared development seed data.
+ * Usage: DATABASE_URL=... npm run db:seed
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -23,9 +23,14 @@ async function main() {
       seedListings.map((l) => ({
         id: l.id,
         title: l.title,
+        identityKey: l.identityKey,
+        identityType: l.identityType,
         url: l.url ?? null,
+        handle: l.handle ?? null,
         npub: l.npub ?? null,
+        categorySlug: l.categorySlug,
         cumulativeSats: l.cumulativeSats,
+        clickCount: l.clickCount,
         createdAt: new Date(l.createdAt),
         updatedAt: new Date(l.createdAt),
         status: l.status,
