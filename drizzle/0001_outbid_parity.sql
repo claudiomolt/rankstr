@@ -23,9 +23,20 @@ ALTER TABLE "listings" ADD COLUMN IF NOT EXISTS "click_count" integer DEFAULT 0 
 
 -- Backfill identity_key for rows created before canonical identities existed so
 -- the NOT NULL + UNIQUE constraints below can be applied without data loss.
+--
+-- This must produce exactly what normalizeIdentity() in src/lib/identity.ts
+-- produces for the same URL, or a legacy listing could never be raised by
+-- resubmitting its own address. Lowercase first: stripping "www." before
+-- folding case would leave "WWW." on the key.
 UPDATE "listings"
 SET "identity_key" = CASE
-	WHEN "url" IS NOT NULL THEN 'url:' || lower(regexp_replace(regexp_replace("url", '^https?://(www\.)?', ''), '[?#].*$', ''))
+	WHEN "url" IS NOT NULL THEN 'url:' || regexp_replace(
+		regexp_replace(
+			regexp_replace(
+				regexp_replace(lower("url"), '^https?://', ''),
+			'^www\.', ''),
+		'[?#].*$', ''),
+	'/+$', '')
 	WHEN "npub" IS NOT NULL THEN 'npub:' || lower("npub")
 	ELSE 'listing:' || "id"
 END
