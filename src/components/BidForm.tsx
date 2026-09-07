@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MIN_BID_SATS, raiseDeltaSats, type Listing } from "@/lib/rankings";
 import { formatSats } from "@/lib/utils";
+import { createElement } from "react";
 
 type Mode = "create" | "raise";
 
@@ -21,6 +22,10 @@ type InvoicePayload = {
     mock: boolean;
   };
 };
+
+function Msg(props: { className: string; text: string }) {
+  return createElement("p", { className: props.className }, props.text);
+}
 
 export function BidForm({ listings }: { listings: Listing[] }) {
   const router = useRouter();
@@ -59,16 +64,13 @@ export function BidForm({ listings }: { listings: Listing[] }) {
         mode === "create"
           ? { title, url: url || undefined, npub: npub || undefined, targetCumulativeSats }
           : { listingId, targetCumulativeSats };
-
       const res = await fetch("/api/bids", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? "Bid failed");
-      }
+      if (!res.ok) throw new Error(data.error ?? "Bid failed");
       setInvoice(data as InvoicePayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bid failed");
@@ -88,10 +90,8 @@ export function BidForm({ listings }: { listings: Listing[] }) {
         body: JSON.stringify({ invoiceId: invoice.invoice.invoiceId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? "Mock pay failed");
-      }
-      setPaidNote(`Paid (mock). Listing now ${formatSats(data.cumulativeSats)}.`);
+      if (!res.ok) throw new Error(data.error ?? "Mock pay failed");
+      setPaidNote("Paid (mock). Listing now " + formatSats(data.cumulativeSats) + ".");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Mock pay failed");
@@ -100,34 +100,35 @@ export function BidForm({ listings }: { listings: Listing[] }) {
     }
   }
 
+  const raiseHint =
+    mode === "raise" && selected ? "; current " + selected.cumulativeSats : "";
+  const createClass =
+    "rounded-none border px-3 py-1.5 text-xs font-mono uppercase " +
+    (mode === "create" ? "border-primary text-primary" : "border-border text-muted-foreground");
+  const raiseClass =
+    "rounded-none border px-3 py-1.5 text-xs font-mono uppercase " +
+    (mode === "raise" ? "border-primary text-primary" : "border-border text-muted-foreground");
+
   return (
     <section
       className="border border-border bg-card p-4"
       style={{ borderLeft: "3px solid hsl(var(--primary))" }}
     >
       <h2 className="font-display text-lg font-semibold lowercase">climb rank</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Pay sats over Lightning to create or raise a listing. Min bid {MIN_BID_SATS} sats.
-        Bitcoin-only.
-      </p>
+      <Msg
+        className="mt-1 text-sm text-muted-foreground"
+        text={
+          "Pay sats over Lightning to create or raise a listing. Min bid " +
+          MIN_BID_SATS +
+          " sats. Bitcoin-only."
+        }
+      />
 
       <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          className={`rounded-none border px-3 py-1.5 text-xs font-mono uppercase ${
-            mode === "create" ? "border-primary text-primary" : "border-border text-muted-foreground"
-          }`}
-          onClick={() => setMode("create")}
-        >
+        <button type="button" className={createClass} onClick={() => setMode("create")}>
           create
         </button>
-        <button
-          type="button"
-          className={`rounded-none border px-3 py-1.5 text-xs font-mono uppercase ${
-            mode === "raise" ? "border-primary text-primary" : "border-border text-muted-foreground"
-          }`}
-          onClick={() => setMode("raise")}
-        >
+        <button type="button" className={raiseClass} onClick={() => setMode("raise")}>
           raise
         </button>
       </div>
@@ -174,7 +175,7 @@ export function BidForm({ listings }: { listings: Listing[] }) {
             >
               {listings.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.title} — {formatSats(l.cumulativeSats)}
+                  {l.title + " — " + formatSats(l.cumulativeSats)}
                 </option>
               ))}
             </select>
@@ -182,11 +183,7 @@ export function BidForm({ listings }: { listings: Listing[] }) {
         )}
 
         <label className="block text-xs text-muted-foreground">
-          target cumulative sats (≥ {MIN_BID_SATS}
-          {mode === "raise" && selected
-            ? `; current ${selected.cumulativeSats}`
-            : ""}
-          )
+          {"target cumulative sats (≥ " + MIN_BID_SATS + raiseHint + ")"}
           <input
             type="number"
             min={MIN_BID_SATS}
@@ -197,15 +194,13 @@ export function BidForm({ listings }: { listings: Listing[] }) {
           />
         </label>
 
-        <p className="font-mono text-xs text-[color:var(--rs-frost)]">
-          invoice amount:{" "}
-          {previewDelta == null ? "invalid target" : formatSats(previewDelta)}
-        </p>
+        <Msg
+          className="font-mono text-xs text-[color:var(--rs-frost)]"
+          text={"invoice amount: " + (previewDelta == null ? "invalid target" : formatSats(previewDelta))}
+        />
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {paidNote ? (
-          <p className="text-sm text-[color:var(--rs-brass)]">{paidNote}</p>
-        ) : null}
+        {error ? <Msg className="text-sm text-destructive" text={error} /> : null}
+        {paidNote ? <Msg className="text-sm text-[color:var(--rs-brass)]" text={paidNote} /> : null}
 
         <button
           type="submit"
@@ -218,15 +213,15 @@ export function BidForm({ listings }: { listings: Listing[] }) {
 
       {invoice ? (
         <div className="mt-4 space-y-2 border border-border bg-background p-3">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--rs-frost)]">
-            lightning invoice {invoice.invoice.mock ? "(mock)" : "(live)"}
-          </p>
-          <p className="break-all font-mono text-xs text-foreground">
-            {invoice.invoice.paymentRequest}
-          </p>
-          <p className="font-mono text-xs text-muted-foreground">
-            pay {formatSats(invoice.amountSats)} · expires {invoice.invoice.expiresAt}
-          </p>
+          <Msg
+            className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--rs-frost)]"
+            text={"lightning invoice " + (invoice.invoice.mock ? "(mock)" : "(live)")}
+          />
+          <Msg className="break-all font-mono text-xs text-foreground" text={invoice.invoice.paymentRequest} />
+          <Msg
+            className="font-mono text-xs text-muted-foreground"
+            text={"pay " + formatSats(invoice.amountSats) + " · expires " + invoice.invoice.expiresAt}
+          />
           {invoice.mockMode || invoice.invoice.mock ? (
             <button
               type="button"
