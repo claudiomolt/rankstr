@@ -1,0 +1,40 @@
+/* rankstr — draft-locked direction 2026-09-07
+   Basalt / vermilion / brass · Saira Condensed / Public Sans / IBM Plex Mono
+   Theme switch: data-theme="dark" | "light" (default dark)
+*/
+:root,
+[data-theme="dark"] {
+  --rs-void: #0D0C0B;
+  --rs-basalt: #181613;
+  --rs-plate: #24211D;
+  --rs-elevated: #2C2823;
+  --rs-rule: #3B3630;
+  --rs-chalk: #F2EEE4;
+  --rs-muted: #AAA298;
+  --rs-faint: #6F695F;
+  --rs-vermilion: #FF4533;
+  --rs-brass: #F2C94C;
+  --rs-brass-fill: #F2C94C;
+  --rs-frost: #B9DCE8;
+  --rs-danger: #FF4533;
+  --font-display: "Saira Condensed", sans-serif;
+  --font-body: "Public Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --radius: 0px; /* instrument: sharp */
+}
+
+[data-theme="light"] {
+  --rs-void: #F4EFE6;
+  --rs-basalt: #EBE4D8;
+  --rs-plate: #FFFFFF;
+  --rs-elevated: #FFFFFF;
+  --rs-rule: #D2C8B6;
+  --rs-chalk: #181613;
+  --rs-muted: #6B645A;
+  --rs-faint: #9A9184;
+  --rs-vermilion: #E03A2A;
+  --rs-brass: #A67F12;
+  --rs-brass-fill: #F2C94C;
+  --rs-frost: #4F6F7C;
+  --rs-danger: #E03A2A;
+}
