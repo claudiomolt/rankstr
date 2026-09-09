@@ -3,14 +3,17 @@ import type { Listing } from "./rankings";
 /**
  * Seed board data for local development and the no-database fallback.
  *
- * Not live traction and not a metric. `identityKey` values match exactly what
+ * Descriptions are plain statements of what each project is. There are no
+ * traction numbers here — click counts start at zero and the sats shown are
+ * fixtures, not claimed revenue. `identityKey` values match exactly what
  * `normalizeIdentity` produces for the same input, so submitting one of these
  * URLs again resolves to the existing row and behaves as a raise.
  */
 export const seedListings: Listing[] = [
   {
     id: "seed-lawallet",
-    title: "LaWallet NWC",
+    title: "LaWallet",
+    description: "Open-source Lightning wallet built on Nostr Wallet Connect.",
     identityKey: "url:lawallet.io",
     identityType: "url",
     url: "https://lawallet.io",
@@ -22,7 +25,8 @@ export const seedListings: Listing[] = [
   },
   {
     id: "seed-rankstr",
-    title: "rankstr (self)",
+    title: "rankstr",
+    description: "This board. Pay sats over Lightning to stand above everyone else.",
     identityKey: "url:rankstr.io",
     identityType: "url",
     url: "https://rankstr.io",
@@ -36,6 +40,7 @@ export const seedListings: Listing[] = [
   {
     id: "seed-nostr-starter",
     title: "Nostr starter",
+    description: "A Nostr identity to follow while you find your first relays.",
     identityKey: "npub:npub168wdr7r7z8q9lndcrulyhxnt95tsczt54qynmvn59q9hp32snjuqhth55f",
     identityType: "npub",
     npub: "npub168wdr7r7z8q9lndcrulyhxnt95tsczt54qynmvn59q9hp32snjuqhth55f",
@@ -48,6 +53,7 @@ export const seedListings: Listing[] = [
   {
     id: "seed-lightning-domain",
     title: "Lightning Domain",
+    description: "Self-hosted LUD16 Lightning Address server for your own domain.",
     identityKey: "url:github.com/lawalletio/lightning-domain",
     identityType: "url",
     url: "https://github.com/lawalletio/lightning-domain",

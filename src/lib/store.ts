@@ -11,7 +11,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { db, hasDatabase } from "@/db";
 import { bids, listings, takeovers } from "@/db/schema";
 import { normalizeCategory } from "@/lib/categories";
@@ -26,6 +26,7 @@ export type BidStatus = "pending" | "paid" | "expired" | "failed";
 
 export type ListingDraft = {
   title: string;
+  description?: string;
   identityKey: string;
   identityType: IdentityType;
   url?: string;
@@ -61,6 +62,13 @@ export type ActivityEntry = {
   settledAt: string;
 };
 
+/** A settled payment reduced to what the Today and Daily boards need to bucket it. */
+export type SettledPayment = {
+  listingId: string;
+  amountSats: number;
+  settledAt: string;
+};
+
 export type Store = {
   listPublic(): Promise<Listing[]>;
   getListing(id: string): Promise<Listing | null>;
@@ -75,6 +83,8 @@ export type Store = {
   putTakeover(takeover: Takeover & { bidId: string }): Promise<Takeover>;
   setTakeoverStatus(id: string, status: TakeoverStatus): Promise<Takeover | null>;
   recentActivity(limit: number): Promise<ActivityEntry[]>;
+  /** Every settled payment at or after `sinceIso`, which is what Today and Daily rank on. */
+  settledSince(sinceIso: string): Promise<SettledPayment[]>;
 };
 
 export function newId(): string {
@@ -148,6 +158,7 @@ const memoryStore: Store = {
     const listing: MemoryListing = {
       id: newId(),
       title: draft.title,
+      description: draft.description,
       identityKey: draft.identityKey,
       identityType: draft.identityType,
       url: draft.url,
@@ -243,6 +254,16 @@ const memoryStore: Store = {
         settledAt: b.settledAt,
       }));
   },
+
+  async settledSince(sinceIso) {
+    const since = new Date(sinceIso).getTime();
+    return [...memory().bids.values()]
+      .filter(
+        (b): b is BidRecord & { settledAt: string } =>
+          b.status === "paid" && b.settledAt !== null && new Date(b.settledAt).getTime() >= since,
+      )
+      .map((b) => ({ listingId: b.listingId, amountSats: b.amountSats, settledAt: b.settledAt }));
+  },
 };
 
 /* ---------------------------------------------------------------- postgres */
@@ -255,6 +276,7 @@ function rowToListing(row: ListingRow): Listing {
   return {
     id: row.id,
     title: row.title,
+    description: row.description ?? undefined,
     identityKey: row.identityKey,
     identityType: row.identityType as IdentityType,
     url: row.url ?? undefined,
@@ -325,6 +347,7 @@ const dbStore: Store = {
       .values({
         id: newId(),
         title: draft.title,
+        description: draft.description ?? null,
         identityKey: draft.identityKey,
         identityType: draft.identityType,
         url: draft.url ?? null,
@@ -457,6 +480,26 @@ const dbStore: Store = {
         kind: r.kind as BidKind,
         amountSats: r.amountSats,
         targetCumulativeSats: r.targetCumulativeSats,
+        settledAt: r.settledAt!.toISOString(),
+      }));
+  },
+
+  async settledSince(sinceIso) {
+    const rows = await db!
+      .select({
+        listingId: bids.listingId,
+        amountSats: bids.amountSats,
+        settledAt: bids.settledAt,
+      })
+      .from(bids)
+      .where(and(eq(bids.status, "paid"), gte(bids.settledAt, new Date(sinceIso))))
+      .orderBy(desc(bids.settledAt));
+
+    return rows
+      .filter((r) => r.settledAt !== null)
+      .map((r) => ({
+        listingId: r.listingId,
+        amountSats: r.amountSats,
         settledAt: r.settledAt!.toISOString(),
       }));
   },

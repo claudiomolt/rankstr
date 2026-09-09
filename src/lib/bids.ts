@@ -44,6 +44,8 @@ export type CreateBidInput = {
   /** Shortcut for raising an existing listing without retyping its identity. */
   listingId?: string;
   title?: string;
+  /** One-line tagline shown under the title on the board. */
+  description?: string;
   /** Optional Nostr enrichment, independent of the listing identity. */
   npub?: string;
   categorySlug?: string;
@@ -106,6 +108,7 @@ async function resolveListing(
   const title = input.title?.trim() || identity.display;
   const listing = await store.createListing({
     title,
+    description: input.description?.trim() || undefined,
     identityKey: identity.key,
     identityType: identity.type,
     url: identity.url,

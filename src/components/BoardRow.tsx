@@ -1,117 +1,155 @@
+import Link from "next/link";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { ListingAvatar } from "@/components/ListingAvatar";
+import type { BoardRowData } from "@/lib/board";
 import { getCategory } from "@/lib/categories";
-import { truncateNpub, type Profile } from "@/lib/nostr";
-import { identityLabel, outboundHref, type Listing } from "@/lib/rankings";
-import { formatCount, formatSats } from "@/lib/utils";
+import { truncateNpub } from "@/lib/nostr";
+import { identityLabel, outboundHref } from "@/lib/rankings";
+import { cn, formatCount, formatSatsShort, hostOf, relativeDate } from "@/lib/utils";
 
-type Props = {
-  listing: Listing;
-  rank: number;
-  profile?: Profile | null;
+/** Podium tint fades out across the top three, then rows go flat. */
+const PODIUM_TINT = ["bg-primary/[0.14]", "bg-primary/[0.08]", "bg-primary/[0.04]"];
+
+export function BoardRow({
+  row,
+  claimSats,
+  showCategory = true,
+}: {
+  row: BoardRowData;
+  /** Sats it would take to claim this rank, shown in the hover pill. */
+  claimSats?: number;
   showCategory?: boolean;
-};
-
-export function BoardRow({ listing, rank, profile, showCategory = true }: Props) {
-  const isLeader = rank === 1;
+}) {
+  const { listing, rank, amountSats, profile } = row;
+  const podium = rank <= 3;
   const href = outboundHref(listing);
-  const label = identityLabel(listing);
   const category = getCategory(listing.categorySlug);
-  const displayName = profile?.name?.trim();
-  const picture = profile?.picture?.trim();
+  const host = hostOf(listing.url);
+  const identity =
+    listing.identityType === "npub" && listing.npub
+      ? truncateNpub(listing.npub)
+      : listing.identityType === "x"
+        ? `@${listing.handle}`
+        : (host ?? identityLabel(listing));
 
-  const stamp =
-    listing.status === "live"
-      ? "border-[color:var(--rs-frost)] text-[color:var(--rs-frost)]"
-      : listing.status === "climbing"
-        ? "border-primary text-primary"
-        : "border-muted-foreground text-muted-foreground";
+  const rankMark = (mobile: boolean) => (
+    <span
+      className={cn(
+        "tabular-nums",
+        mobile ? "mr-1.5 md:hidden" : "hidden min-w-7 items-center justify-center md:inline-flex md:min-w-10 md:text-base",
+        !mobile && "text-xs",
+        podium ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+      )}
+    >
+      #{rank}
+    </span>
+  );
 
   return (
-    <div
-      className="grid grid-cols-[3rem_1fr_auto] items-center gap-3 border border-border bg-card px-4 py-3"
-      style={{ borderLeft: "3px solid hsl(var(--primary))" }}
+    <article
+      className={cn(
+        "group relative scroll-mt-6",
+        podium ? "rounded-xl md:rounded-2xl" : "border-t border-border px-3 md:px-4",
+      )}
     >
+      {href ? (
+        <a
+          href={`/go/${listing.id}`}
+          rel="noreferrer nofollow"
+          aria-label={`Open ${listing.title}`}
+          className="absolute inset-0 z-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        />
+      ) : null}
+
       <div
-        className={
-          "font-mono text-lg font-semibold " +
-          (isLeader ? "text-accent" : "text-[color:var(--rs-frost)]")
-        }
-      >
-        #{String(rank).padStart(2, "0")}
-      </div>
-
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          {picture ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={picture}
-              alt=""
-              width={20}
-              height={20}
-              className="h-5 w-5 shrink-0 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : null}
-          <span className="truncate font-sans text-sm font-semibold text-card-foreground">
-            {listing.title}
-          </span>
-          {displayName ? (
-            <span className="truncate font-sans text-xs text-muted-foreground">{displayName}</span>
-          ) : null}
-          <span
-            className={"rounded-none border px-1.5 py-0.5 font-mono text-[10px] uppercase " + stamp}
-          >
-            {listing.status}
-          </span>
-          {showCategory && category ? (
-            <a
-              href={`/c/${category.slug}`}
-              className="rounded-none border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground"
-            >
-              {category.label}
-            </a>
-          ) : null}
-        </div>
-
-        {href ? (
-          <a
-            href={`/go/${listing.id}`}
-            rel="noreferrer nofollow"
-            className="mt-1 block truncate font-mono text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          >
-            {label}
-          </a>
-        ) : (
-          <div className="mt-1 truncate font-mono text-xs text-[color:var(--rs-frost)]" title={label}>
-            {listing.npub ? truncateNpub(listing.npub) : label}
-          </div>
+        className={cn(
+          "relative z-10 overflow-hidden",
+          podium && `rounded-xl px-3 md:rounded-2xl md:px-4 ${PODIUM_TINT[rank - 1]}`,
         )}
-
-        {listing.identityType !== "npub" && listing.npub ? (
-          <div
-            className="mt-1 truncate font-mono text-xs text-[color:var(--rs-frost)]"
-            title={listing.npub}
-          >
-            {truncateNpub(listing.npub)}
+      >
+        <div className="pointer-events-none relative z-10 flex items-start gap-2 py-3 md:gap-3 md:py-4">
+          <div className="flex shrink-0 items-center md:gap-3">
+            {rankMark(false)}
+            <ListingAvatar
+              listing={listing}
+              profile={profile}
+              className={podium ? "size-14 md:size-18" : "size-10 md:size-14"}
+            />
           </div>
-        ) : null}
-      </div>
 
-      <div className="text-right">
-        <div
-          className={
-            "font-mono text-sm " +
-            (isLeader ? "text-accent underline decoration-accent" : "text-primary")
-          }
-        >
-          {formatSats(listing.cumulativeSats)}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <p
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm md:text-base",
+                  podium ? "font-semibold text-foreground" : "font-medium",
+                )}
+              >
+                {rankMark(true)}
+                {listing.title}
+              </p>
+              <p className="shrink-0 text-sm font-semibold tabular-nums text-primary md:text-base">
+                {formatSatsShort(amountSats)}
+                <span className="ml-1 text-[0.75em] font-medium">sats</span>
+              </p>
+            </div>
+
+            {listing.description ? (
+              <p className="line-clamp-1 text-xs text-muted-foreground/70 md:text-sm">
+                {listing.description}
+              </p>
+            ) : null}
+
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] md:text-xs">
+              {showCategory && category ? (
+                <>
+                  <Link
+                    href={`/category/${category.slug}`}
+                    className="pointer-events-auto inline-flex items-center gap-1 font-semibold text-foreground transition-colors hover:text-foreground/80"
+                  >
+                    <CategoryIcon icon={category.icon} className="size-3 shrink-0" />
+                    {category.short}
+                  </Link>
+                  <Dot />
+                </>
+              ) : null}
+              <time
+                dateTime={listing.createdAt}
+                className="shrink-0 text-muted-foreground/70"
+              >
+                {relativeDate(listing.createdAt)}
+              </time>
+              <Dot />
+              <span className="truncate font-medium text-muted-foreground">{identity}</span>
+              {listing.clickCount > 0 ? (
+                <>
+                  <Dot />
+                  <span className="tabular-nums text-muted-foreground/70">
+                    {formatCount(listing.clickCount)} clicks
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
         </div>
-        {listing.clickCount > 0 ? (
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            {formatCount(listing.clickCount)} clicks
-          </div>
-        ) : null}
       </div>
-    </div>
+
+      {claimSats !== undefined ? (
+        <Link
+          href={`/?claim=${encodeURIComponent(listing.identityKey)}&sats=${claimSats}#claim`}
+          className="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-primary-foreground opacity-0 shadow-sm transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+        >
+          claim this rank for {formatSatsShort(claimSats)} sats
+        </Link>
+      ) : null}
+    </article>
+  );
+}
+
+function Dot() {
+  return (
+    <span aria-hidden className="text-muted-foreground/45">
+      ·
+    </span>
   );
 }
