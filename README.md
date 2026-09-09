@@ -25,7 +25,10 @@ With no environment set at all the board runs on an in-process store and a mock 
 | `/daily` | UTC calendar-day archive; the current day stays live until midnight UTC |
 | `/categories` | Category index with the leader of each board |
 | `/category/[slug]` | Category board — same rules, narrower scope (`/c/[slug]` redirects here) |
+| `/listing/[id]` | One listing: its rank on each board, how it got there, and what it costs to outrank |
+| `/search?q=` | Free-text search over titles, descriptions, identities, and categories |
 | `/rules` | The ranking contract |
+| `/about` | What the board is and where its numbers come from |
 | `/active` | Curated index of active projects (seeded, not discovery) |
 | `/go/[id]` | Outbound click: counts the click, redirects without query parameters |
 

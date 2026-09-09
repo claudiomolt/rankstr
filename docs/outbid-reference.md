@@ -64,6 +64,20 @@ Structure, in source order on the board pages:
 The confirm step is a modal: `Confirm this rank`, a RANK tile and a PRICE tile marked `Due now`, a
 disclaimer, a terms checkbox, then `Cancel` / `Continue to checkout`.
 
+Search is not a dialog. The header's magnifier toggles an inline bar between the header row and the
+category rail — full width, `rounded-xl`, placeholder `Search products and categories…` — which
+pushes the rest of the page down.
+
+The `see details` link on every row goes to `/product/<host>`, which is laid out as: a
+`Leaderboard · <Category>` breadcrumb, a tinted hero card (mark, title, `category · host · age ·
+clicks` meta, description, then `Visit ›` and `Copy link`), two rank cards (`CATEGORY RANK` and
+`OVERALL`, each with an `of N` line and a coral link to that board), an `About this ranking` section
+that opens with a raise-count and click summary and then answers `What rank does X hold?`, `Has X
+ranked today?` and `How do I outrank X?`, and finally an `Also in <Category>` list of five.
+
+rankstr uses `/listing/<id>` rather than a host-derived path, because a listing can be a URL, an X
+handle, or an npub, and the id is the only identifier all three share without collision.
+
 ## Source of truth — `/rules`, verbatim
 
 > # Rules
