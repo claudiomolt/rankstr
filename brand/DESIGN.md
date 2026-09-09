@@ -1,5 +1,10 @@
 # DESIGN.md — rankstr
 
+> **Not in force on the public UI (2026-09-09).** Agustin rejected the Basalt / vermilion / brass
+> look for the public product and directed that it be a visual clone of outbid.lol instead. The
+> tokens and components below are kept for reference and for any non-public surface; the shipped
+> system is documented in [`../docs/outbid-reference.md`](../docs/outbid-reference.md).
+
 **Status:** **ready-for-dev** · Agustin last-yes DEV 2026-09-07. Canva/vault canonical still gated  
 **Direction:** Basalt / vermilion / brass (Precision Instrument / Signal Rail)  
 **Source pick:** `options/model-gpt-cursor/` · GPT engine  

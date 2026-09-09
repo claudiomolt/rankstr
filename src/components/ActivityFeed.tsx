@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { ActivityEntry } from "@/lib/store";
-import { formatSats, timeAgo } from "@/lib/utils";
+import { formatSatsShort, timeAgo } from "@/lib/utils";
+import { LiveDot } from "@/components/LiveDot";
 
 const REFRESH_MS = 15_000;
 
@@ -13,6 +14,8 @@ const REFRESH_MS = 15_000;
  */
 export function ActivityFeed({ initial }: { initial: ActivityEntry[] }) {
   const [entries, setEntries] = useState(initial);
+
+  useEffect(() => setEntries(initial), [initial]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,28 +37,31 @@ export function ActivityFeed({ initial }: { initial: ActivityEntry[] }) {
   }, []);
 
   return (
-    <section className="border border-border bg-card p-4" aria-label="Recent settled bids">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--rs-frost)]">
-        live activity
+    <section className="-mx-4 mt-2 mb-2 px-4 py-2 md:mx-0 md:py-3" aria-label="Latest activity">
+      <h2 className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold tracking-[-0.02em] md:mb-2.5">
+        <LiveDot />
+        Latest activity
       </h2>
       {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           No settled payments yet. A completed payment is what claims a rank.
         </p>
       ) : (
-        <ul className="mt-2 space-y-1">
+        <ul className="space-y-1">
           {entries.map((entry) => (
             <li
               key={entry.bidId}
-              className="flex flex-wrap items-baseline justify-between gap-2 font-mono text-xs"
+              className="flex items-baseline gap-2 text-xs text-muted-foreground"
             >
-              <span className="truncate text-card-foreground">
-                {entry.kind === "takeover" ? "takeover · " : ""}
+              <span className="min-w-0 flex-1 truncate text-foreground">
+                {entry.kind === "takeover" ? "Takeover · " : ""}
                 {entry.listingTitle}
               </span>
-              <span className="text-primary">
-                +{formatSats(entry.amountSats)}
-                <span className="ml-2 text-muted-foreground">{timeAgo(entry.settledAt)}</span>
+              <span className="shrink-0 tabular-nums" suppressHydrationWarning>
+                <span className="font-semibold text-primary">
+                  {formatSatsShort(entry.amountSats)} sats
+                </span>{" "}
+                {timeAgo(entry.settledAt)}
               </span>
             </li>
           ))}

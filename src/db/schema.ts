@@ -51,6 +51,7 @@ export const listings = pgTable(
     handle: text("handle"),
     npub: text("npub"),
     title: text("title").notNull(),
+    description: text("description"),
     categorySlug: text("category_slug").notNull().default("other"),
     cumulativeSats: integer("cumulative_sats").notNull().default(0),
     clickCount: integer("click_count").notNull().default(0),

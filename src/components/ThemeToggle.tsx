@@ -1,33 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+
+const STORAGE_KEY = "rankstr-theme";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("rankstr-theme") as "dark" | "light" | null;
-    const next = stored ?? "dark";
-    setTheme(next);
+    const stored = window.localStorage.getItem(STORAGE_KEY) as "dark" | "light" | null;
+    if (stored) apply(stored);
+    setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+  }, []);
+
+  function apply(next: "dark" | "light") {
     document.documentElement.classList.toggle("dark", next === "dark");
     document.documentElement.setAttribute("data-theme", next);
-  }, []);
+  }
 
   function toggle() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-    document.documentElement.setAttribute("data-theme", next);
-    window.localStorage.setItem("rankstr-theme", next);
+    apply(next);
+    window.localStorage.setItem(STORAGE_KEY, next);
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       onClick={toggle}
-      className="rounded-none border border-border px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-muted-foreground hover:border-primary hover:text-foreground"
+      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
     >
-      {theme === "dark" ? "light" : "dark"}
-    </button>
+      {theme === "dark" ? <Sun strokeWidth={1.5} /> : <Moon strokeWidth={1.5} />}
+    </Button>
   );
 }

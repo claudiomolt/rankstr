@@ -5,6 +5,8 @@ export type ListingStatus = "live" | "open" | "climbing";
 export type Listing = {
   id: string;
   title: string;
+  /** One-line tagline the submitter supplies. Printed under the title on the board. */
+  description?: string;
   /** Canonical identity key from src/lib/identity.ts — one listing per key. */
   identityKey: string;
   identityType: IdentityType;
@@ -43,6 +45,14 @@ export const BID_STEP_SATS = 1;
 
 /** Rows per board page. Gives "locks the first page" a concrete meaning. */
 export const BOARD_PAGE_SIZE = 20;
+
+/**
+ * The three windows the same payments are ranked in.
+ *
+ * One payment ranks a listing on every board that includes that spend — the
+ * boards differ only in the slice of time they look at.
+ */
+export type BoardWindow = "all-time" | "today" | "daily";
 
 /** Rank = cumulative sats DESC; equal sats → the older listing keeps the higher rank. */
 export function sortListings(listings: Listing[]): Listing[] {

@@ -52,4 +52,12 @@ Still not Canva/vault-canonical until last-yes.
 
 **Branding last-yes (dev):** Agustin 2026-09-07. Canva/vault still gated.
 
+## Branding override (2026-09-09)
+
+**Agustin overrode the 2026-09-07 pick for the public UI.** The public product must be a visual
+clone of outbid.lol, not a rebranded board. Basalt / vermilion / brass is out of force on public
+surfaces; the shipped tokens are read off the live outbid stylesheet and recorded in
+`docs/outbid-reference.md`. The rankstr wordmark stays wherever outbid shows its own name. Payments,
+sats denomination, the 1000 sat minimum, and Nostr npub identity are unchanged.
+
 **Repo:** PUBLIC https://github.com/claudiomolt/rankstr — owner last-yes Agustin 2026-09-07 (moved from agustinkassis).

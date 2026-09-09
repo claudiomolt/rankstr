@@ -1,6 +1,8 @@
+import { Crown } from "lucide-react";
+import { ListingAvatar } from "@/components/ListingAvatar";
 import { identityLabel, outboundHref, type Listing } from "@/lib/rankings";
 import { takeoverRemainingMs, type Takeover } from "@/lib/takeover";
-import { formatSats } from "@/lib/utils";
+import { formatSatsShort } from "@/lib/utils";
 
 function remainingLabel(takeover: Takeover): string {
   const minutes = Math.ceil(takeoverRemainingMs(takeover) / 60000);
@@ -10,35 +12,43 @@ function remainingLabel(takeover: Takeover): string {
 }
 
 /** The live takeover holds the top of page 1 for its 3-hour window. */
-export function TakeoverBanner({ takeover, listing }: { takeover: Takeover; listing: Listing }) {
+export function TakeoverBanner({
+  takeover,
+  listing,
+}: {
+  takeover: Takeover;
+  listing: Listing;
+}) {
   const href = outboundHref(listing);
 
   return (
     <section
-      className="border border-accent bg-card px-4 py-3"
-      style={{ borderLeft: "3px solid hsl(var(--accent))" }}
+      className="relative overflow-hidden rounded-2xl border border-primary/40 bg-primary/[0.09] px-4 py-4"
       aria-label="Board takeover"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
-          board takeover · {remainingLabel(takeover)}
-        </p>
-        <p className="font-mono text-xs text-accent">{formatSats(takeover.amountSats)}</p>
-      </div>
-      <h2 className="mt-1 font-display text-2xl font-bold lowercase tracking-tight">
-        {listing.title}
-      </h2>
       {href ? (
         <a
           href={`/go/${listing.id}`}
           rel="noreferrer nofollow"
-          className="font-mono text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        >
-          {identityLabel(listing)}
-        </a>
-      ) : (
-        <p className="font-mono text-xs text-muted-foreground">{identityLabel(listing)}</p>
-      )}
+          aria-label={`Open ${listing.title}`}
+          className="absolute inset-0 z-0 rounded-[inherit]"
+        />
+      ) : null}
+      <div className="pointer-events-none relative z-10 flex items-center gap-3">
+        <ListingAvatar listing={listing} className="size-14 md:size-16" />
+        <div className="min-w-0 flex-1">
+          <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary md:text-xs">
+            <Crown className="size-3.5" strokeWidth={1.5} aria-hidden />
+            Board takeover · {remainingLabel(takeover)}
+          </p>
+          <p className="truncate text-base font-semibold md:text-lg">{listing.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{identityLabel(listing)}</p>
+        </div>
+        <p className="shrink-0 text-sm font-semibold tabular-nums text-primary md:text-base">
+          {formatSatsShort(takeover.amountSats)}
+          <span className="ml-1 text-[0.75em] font-medium">sats</span>
+        </p>
+      </div>
     </section>
   );
 }

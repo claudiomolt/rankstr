@@ -2,134 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* rankstr → shadcn semantic CSS variables + brand --rs-* aliases
-   Paste into app globals after shadcn init. HSL channels (no hsl() wrapper) for shadcn.
-   Brand hex aliases match tokens.yaml / tokens.css — do NOT invent new hex.
-   ready-for-dev · Agustin last-yes DEV 2026-09-07 · Canva/vault still gated
-*/
+/* Visual system cloned from the live outbid.lol stylesheet (warm paper +
+   coral accent, Poppins, 14px pill radius). HSL channels so Tailwind opacity
+   modifiers work: hsl(var(--primary) / <alpha-value>). */
 :root {
-  /* —— shadcn semantic (light = bone paper) —— */
-  --background: 36 33% 93%;          /* void #F4EFE6 */
-  --foreground: 30 10% 8%;           /* chalk #181613 */
-  --card: 0 0% 100%;                 /* plate */
-  --card-foreground: 30 10% 8%;
+  --background: 36 100% 99%;
+  --foreground: 30 5% 15%;
+  --card: 36 100% 99%;
+  --card-foreground: 30 5% 15%;
   --popover: 0 0% 100%;
-  --popover-foreground: 30 10% 8%;
-  --primary: 5 75% 52%;              /* vermilion #E03A2A */
-  --primary-foreground: 30 40% 97%;
-  --secondary: 36 22% 88%;           /* basalt-ish #EBE4D8 */
-  --secondary-foreground: 30 10% 8%;
-  --muted: 36 18% 86%;
-  --muted-foreground: 30 8% 39%;     /* #6B645A */
-  --accent: 43 80% 36%;              /* brass text #A67F12 */
-  --accent-foreground: 36 33% 93%;
-  --destructive: 5 75% 52%;
-  --destructive-foreground: 30 40% 97%;
-  --border: 36 22% 77%;              /* rule #D2C8B6 */
-  --input: 36 22% 77%;
-  --ring: 5 75% 52%;
-  --radius: 0rem;
-
-  /* —— brand aliases (hex, from tokens.yaml light) —— */
-  --rs-void: #F4EFE6;
-  --rs-basalt: #EBE4D8;
-  --rs-plate: #FFFFFF;
-  --rs-elevated: #FFFFFF;
-  --rs-rule: #D2C8B6;
-  --rs-chalk: #181613;
-  --rs-muted: #6B645A;
-  --rs-faint: #9A9184;
-  --rs-vermilion: #E03A2A;
-  --rs-brass: #A67F12;
-  --rs-brass-fill: #F2C94C;
-  --rs-frost: #4F6F7C;
-  --rs-danger: #E03A2A;
-
-  --font-display: "Saira Condensed", sans-serif;
-  --font-body: "Public Sans", sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  --popover-foreground: 30 5% 15%;
+  --primary: 12 73% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 34 28% 95%;
+  --secondary-foreground: 30 5% 15%;
+  --muted: 34 28% 95%;
+  --muted-foreground: 30 5% 38%;
+  --accent: 34 28% 95%;
+  --accent-foreground: 30 5% 15%;
+  --destructive: 355 100% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 30 19% 88%;
+  --input: 30 19% 88%;
+  --ring: 12 73% 62%;
+  --live: 138 100% 31%;
+  --surface: 0 0% 100%;
+  --radius: 0.875rem;
 }
 
 .dark,
 [data-theme="dark"] {
-  --background: 30 10% 5%;           /* void #0D0C0B */
-  --foreground: 40 30% 93%;          /* chalk #F2EEE4 */
-  --card: 30 10% 13%;                /* plate #24211D */
-  --card-foreground: 40 30% 93%;
-  --popover: 30 10% 9%;              /* basalt #181613 */
-  --popover-foreground: 40 30% 93%;
-  --primary: 5 100% 60%;             /* vermilion #FF4533 */
-  --primary-foreground: 30 40% 97%;
-  --secondary: 30 10% 14%;           /* plate/elevated */
-  --secondary-foreground: 40 30% 93%;
-  --muted: 30 10% 14%;
-  --muted-foreground: 30 8% 63%;     /* #AAA298 */
-  --accent: 43 84% 62%;              /* brass #F2C94C */
-  --accent-foreground: 30 10% 8%;
-  --destructive: 5 100% 60%;
-  --destructive-foreground: 30 40% 97%;
-  --border: 30 8% 22%;               /* rule #3B3630 */
-  --input: 30 8% 22%;
-  --ring: 5 100% 60%;
-
-  --rs-void: #0D0C0B;
-  --rs-basalt: #181613;
-  --rs-plate: #24211D;
-  --rs-elevated: #2C2823;
-  --rs-rule: #3B3630;
-  --rs-chalk: #F2EEE4;
-  --rs-muted: #AAA298;
-  --rs-faint: #6F695F;
-  --rs-vermilion: #FF4533;
-  --rs-brass: #F2C94C;
-  --rs-brass-fill: #F2C94C;
-  --rs-frost: #B9DCE8;
-  --rs-danger: #FF4533;
+  --background: 22 18% 9%;
+  --foreground: 40 27% 96%;
+  --card: 22 13% 12%;
+  --card-foreground: 40 27% 96%;
+  --popover: 22 13% 12%;
+  --popover-foreground: 40 27% 96%;
+  --primary: 12 73% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 27 11% 16%;
+  --secondary-foreground: 40 27% 96%;
+  --muted: 27 11% 16%;
+  --muted-foreground: 30 9% 64%;
+  --accent: 27 11% 16%;
+  --accent-foreground: 40 27% 96%;
+  --destructive: 359 100% 70%;
+  --destructive-foreground: 22 18% 9%;
+  --border: 30 9% 22%;
+  --input: 30 9% 26%;
+  --ring: 12 73% 62%;
+  --live: 128 47% 53%;
+  --surface: 22 13% 12%;
 }
 
-[data-theme="light"] {
-  /* mirror :root for data-theme switchers */
-  --background: 36 33% 93%;
-  --foreground: 30 10% 8%;
-  --card: 0 0% 100%;
-  --card-foreground: 30 10% 8%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 30 10% 8%;
-  --primary: 5 75% 52%;
-  --primary-foreground: 30 40% 97%;
-  --secondary: 36 22% 88%;
-  --secondary-foreground: 30 10% 8%;
-  --muted: 36 18% 86%;
-  --muted-foreground: 30 8% 39%;
-  --accent: 43 80% 36%;
-  --accent-foreground: 36 33% 93%;
-  --destructive: 5 75% 52%;
-  --destructive-foreground: 30 40% 97%;
-  --border: 36 22% 77%;
-  --input: 36 22% 77%;
-  --ring: 5 75% 52%;
-
-  --rs-void: #F4EFE6;
-  --rs-basalt: #EBE4D8;
-  --rs-plate: #FFFFFF;
-  --rs-elevated: #FFFFFF;
-  --rs-rule: #D2C8B6;
-  --rs-chalk: #181613;
-  --rs-muted: #6B645A;
-  --rs-faint: #9A9184;
-  --rs-vermilion: #E03A2A;
-  --rs-brass: #A67F12;
-  --rs-brass-fill: #F2C94C;
-  --rs-frost: #4F6F7C;
-  --rs-danger: #E03A2A;
+html {
+  -webkit-text-size-adjust: 100%;
 }
-
 
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: var(--font-body);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
 }
 
-.font-display { font-family: var(--font-display); }
-.font-mono { font-family: var(--font-mono); }
+/* Category rail and long boards scroll sideways without a visible track. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       identity?: string;
       listingId?: string;
       title?: string;
+      description?: string;
       npub?: string;
       categorySlug?: string;
       bidSats?: number;
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       identity: body.identity,
       listingId: body.listingId,
       title: body.title,
+      description: body.description,
       npub: body.npub,
       categorySlug: body.categorySlug,
       bidSats: Number(body.bidSats ?? 0),
