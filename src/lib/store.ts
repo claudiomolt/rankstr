@@ -85,6 +85,8 @@ export type Store = {
   recentActivity(limit: number): Promise<ActivityEntry[]>;
   /** Every settled payment at or after `sinceIso`, which is what Today and Daily rank on. */
   settledSince(sinceIso: string): Promise<SettledPayment[]>;
+  /** Every settled payment for one listing, newest first. Drives the raise history. */
+  settledForListing(listingId: string): Promise<SettledPayment[]>;
 };
 
 export function newId(): string {
@@ -262,6 +264,16 @@ const memoryStore: Store = {
         (b): b is BidRecord & { settledAt: string } =>
           b.status === "paid" && b.settledAt !== null && new Date(b.settledAt).getTime() >= since,
       )
+      .map((b) => ({ listingId: b.listingId, amountSats: b.amountSats, settledAt: b.settledAt }));
+  },
+
+  async settledForListing(listingId) {
+    return [...memory().bids.values()]
+      .filter(
+        (b): b is BidRecord & { settledAt: string } =>
+          b.listingId === listingId && b.status === "paid" && b.settledAt !== null,
+      )
+      .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime())
       .map((b) => ({ listingId: b.listingId, amountSats: b.amountSats, settledAt: b.settledAt }));
   },
 };
@@ -493,6 +505,26 @@ const dbStore: Store = {
       })
       .from(bids)
       .where(and(eq(bids.status, "paid"), gte(bids.settledAt, new Date(sinceIso))))
+      .orderBy(desc(bids.settledAt));
+
+    return rows
+      .filter((r) => r.settledAt !== null)
+      .map((r) => ({
+        listingId: r.listingId,
+        amountSats: r.amountSats,
+        settledAt: r.settledAt!.toISOString(),
+      }));
+  },
+
+  async settledForListing(listingId) {
+    const rows = await db!
+      .select({
+        listingId: bids.listingId,
+        amountSats: bids.amountSats,
+        settledAt: bids.settledAt,
+      })
+      .from(bids)
+      .where(and(eq(bids.listingId, listingId), eq(bids.status, "paid")))
       .orderBy(desc(bids.settledAt));
 
     return rows

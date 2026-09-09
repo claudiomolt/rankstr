@@ -253,6 +253,124 @@ export async function loadDailyBoards(
   return { boards, startedOn: earliest };
 }
 
+export type ListingDetail = {
+  listing: Listing;
+  profile: Profile | null;
+  category: Category | null;
+  overallRank: number;
+  overallTotal: number;
+  categoryRank: number;
+  categoryTotal: number;
+  /** Sats this listing took in the rolling 24h window; 0 means it is off Today's board. */
+  satsToday: number;
+  todayRank: number | null;
+  /** Smallest amount that takes this listing's rank. */
+  outrankSats: number;
+  raiseCount: number;
+  lastRaiseAt: string | null;
+  alsoInCategory: BoardRowData[];
+};
+
+/**
+ * Everything the listing page prints. Ranks are recomputed here rather than
+ * stored, so a listing's page can never disagree with the board it came from.
+ */
+export async function loadListingDetail(
+  listingId: string,
+  options: { now?: Date } = {},
+): Promise<ListingDetail | null> {
+  const store = getStore();
+  const now = options.now ?? new Date();
+
+  const [all, payments, rolling] = await Promise.all([
+    store.listPublic(),
+    store.settledForListing(listingId),
+    store.settledSince(new Date(now.getTime() - DAY_MS).toISOString()),
+  ]);
+
+  const overall = sortListings(all);
+  const overallIndex = overall.findIndex((l) => l.id === listingId);
+  if (overallIndex === -1) return null;
+
+  const listing = overall[overallIndex];
+  const category = getCategory(listing.categorySlug);
+  const scoped = overall.filter((l) => l.categorySlug === listing.categorySlug);
+  const categoryIndex = scoped.findIndex((l) => l.id === listingId);
+
+  const rollingTotals = sumByListing(rolling);
+  const todayRanked = rankByAmount(all, (l) => rollingTotals.get(l.id) ?? 0);
+  const todayIndex = todayRanked.findIndex((entry) => entry.listing.id === listingId);
+
+  const npubs = scoped.map((l) => l.npub).filter((n): n is string => Boolean(n?.trim()));
+  const profiles = await fetchProfiles(npubs);
+
+  return {
+    listing,
+    profile: listing.npub ? profiles.get(listing.npub) ?? null : null,
+    category,
+    overallRank: overallIndex + 1,
+    overallTotal: overall.length,
+    categoryRank: categoryIndex + 1,
+    categoryTotal: scoped.length,
+    satsToday: rollingTotals.get(listingId) ?? 0,
+    todayRank: todayIndex === -1 ? null : todayIndex + 1,
+    outrankSats: claimTopFor(listing.cumulativeSats),
+    raiseCount: payments.length,
+    lastRaiseAt: payments[0]?.settledAt ?? null,
+    alsoInCategory: scoped
+      .filter((l) => l.id !== listingId)
+      .slice(0, 5)
+      .map((l) => ({
+        listing: l,
+        amountSats: l.cumulativeSats,
+        rank: scoped.findIndex((s) => s.id === l.id) + 1,
+        profile: l.npub ? profiles.get(l.npub) ?? null : null,
+      })),
+  };
+}
+
+/**
+ * Free-text search across the public board. Matches title, description and the
+ * submitted identity, so a domain, an @handle or an npub all find their listing.
+ */
+export async function searchListings(
+  query: string,
+  options: { limit?: number } = {},
+): Promise<BoardRowData[]> {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+
+  const store = getStore();
+  const all = sortListings(await store.listPublic());
+
+  const matches = all
+    .map((listing, index) => ({ listing, rank: index + 1 }))
+    .filter(({ listing }) => {
+      const category = getCategory(listing.categorySlug);
+      return [
+        listing.title,
+        listing.description,
+        listing.url,
+        listing.handle,
+        listing.npub,
+        category?.label,
+      ]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(needle));
+    })
+    .slice(0, options.limit ?? 30);
+
+  const npubs = matches.map((m) => m.listing.npub).filter((n): n is string => Boolean(n?.trim()));
+  const profiles = await fetchProfiles(npubs);
+
+  return matches.map(({ listing, rank }) => ({
+    listing,
+    rank,
+    amountSats: listing.cumulativeSats,
+    profile: listing.npub ? profiles.get(listing.npub) ?? null : null,
+  }));
+}
+
 /** Per-category summary used by the Categories index. */
 export type CategorySummary = {
   category: Category;

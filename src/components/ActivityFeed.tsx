@@ -57,7 +57,7 @@ export function ActivityFeed({ initial }: { initial: ActivityEntry[] }) {
                 {entry.kind === "takeover" ? "Takeover · " : ""}
                 {entry.listingTitle}
               </span>
-              <span className="shrink-0 tabular-nums">
+              <span className="shrink-0 tabular-nums" suppressHydrationWarning>
                 <span className="font-semibold text-primary">
                   {formatSatsShort(entry.amountSats)} sats
                 </span>{" "}

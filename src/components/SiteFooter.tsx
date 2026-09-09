@@ -4,6 +4,7 @@ import { formatCount } from "@/lib/utils";
 
 const LINKS = [
   { href: "/rules", label: "Rules" },
+  { href: "/about", label: "About" },
   { href: "/categories", label: "Categories" },
   { href: "/daily", label: "Daily" },
   { href: "/today", label: "Today" },

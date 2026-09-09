@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { LiveDot } from "@/components/LiveDot";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { HeaderShell } from "@/components/SiteSearch";
 import { getStore } from "@/lib/store";
 import { formatCount } from "@/lib/utils";
 
 const NAV = [
   { href: "/daily", label: "Daily" },
   { href: "/categories", label: "Categories" },
-  { href: "/rules", label: "Rules" },
+  { href: "/about", label: "About" },
+  { href: "/rules", label: "Rules", desktopOnly: true },
 ];
 
 /**
@@ -21,57 +22,53 @@ export async function SiteHeader() {
   const listings = await getStore().listPublic();
   const satsClaimed = listings.reduce((sum, l) => sum + l.cumulativeSats, 0);
 
+  const brand = (
+    <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+      <Link
+        href="/"
+        className="inline-flex shrink-0 items-center gap-1.5 text-[22px] font-medium tracking-[-0.04em]"
+      >
+        <RankMark />
+        <span>
+          rankstr<span className="text-primary">.</span>
+        </span>
+      </Link>
+      <div className="hidden min-w-0 md:block">
+        <Link
+          href="/daily"
+          className="inline-block max-w-full whitespace-nowrap rounded-full border border-border px-2.5 py-1 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <LiveDot />
+            <span className="font-semibold text-live">board live</span>
+          </span>
+          <span> · {formatCount(listings.length)} listings</span>
+          <span className="text-foreground"> · {formatCount(satsClaimed)} sats claimed →</span>
+        </Link>
+      </div>
+    </div>
+  );
+
+  const nav = (
+    <nav>
+      <ul className="flex items-center gap-3 text-xs sm:gap-6 sm:text-sm">
+        {NAV.map((item) => (
+          <li key={item.href} className={item.desktopOnly ? "hidden md:block" : undefined}>
+            <Link
+              href={item.href}
+              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+
   return (
     <header className="w-full">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 pt-6 pb-3.5 md:pb-4">
-        <div className="flex w-full items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-            <Link
-              href="/"
-              className="inline-flex shrink-0 items-center gap-1.5 text-[22px] font-medium tracking-[-0.04em]"
-            >
-              <RankMark />
-              <span>
-                rankstr<span className="text-primary">.</span>
-              </span>
-            </Link>
-            <div className="hidden min-w-0 md:block">
-              <Link
-                href="/daily"
-                className="inline-block max-w-full whitespace-nowrap rounded-full border border-border px-2.5 py-1 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                  <LiveDot />
-                  <span className="font-semibold text-live">board live</span>
-                </span>
-                <span> · {formatCount(listings.length)} listings</span>
-                <span className="text-foreground">
-                  {" "}
-                  · {formatCount(satsClaimed)} sats claimed →
-                </span>
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-4">
-            <nav>
-              <ul className="flex items-center gap-3 text-xs sm:gap-6 sm:text-sm">
-                {NAV.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
+      <HeaderShell brand={brand} nav={nav} />
     </header>
   );
 }

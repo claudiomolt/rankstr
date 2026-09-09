@@ -64,7 +64,9 @@ export default async function CategoriesPage() {
                       {formatCount(summary.claimsToday)}{" "}
                       {summary.claimsToday === 1 ? "claim" : "claims"}
                     </span>
-                    {summary.lastClaimAt ? <span>{timeAgo(summary.lastClaimAt)}</span> : null}
+                    {summary.lastClaimAt ? (
+                      <span suppressHydrationWarning>{timeAgo(summary.lastClaimAt)}</span>
+                    ) : null}
                   </div>
                   {summary.top[0] ? (
                     <div className="flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 text-xs">

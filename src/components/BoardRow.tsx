@@ -113,9 +113,11 @@ export function BoardRow({
                   <Dot />
                 </>
               ) : null}
+              {/* Relative stamps drift between the server render and hydration. */}
               <time
                 dateTime={listing.createdAt}
                 className="shrink-0 text-muted-foreground/70"
+                suppressHydrationWarning
               >
                 {relativeDate(listing.createdAt)}
               </time>
@@ -129,6 +131,13 @@ export function BoardRow({
                   </span>
                 </>
               ) : null}
+              <Dot />
+              <Link
+                href={`/listing/${listing.id}`}
+                className="pointer-events-auto font-medium text-muted-foreground/70 transition-colors hover:text-primary"
+              >
+                see details
+              </Link>
             </p>
           </div>
         </div>
