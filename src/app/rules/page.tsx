@@ -4,6 +4,10 @@ import { BID_STEP_SATS, BOARD_PAGE_SIZE, MIN_BID_SATS } from "@/lib/rankings";
 import { TAKEOVER_MULTIPLIER } from "@/lib/takeover";
 import { formatCount, formatSats } from "@/lib/utils";
 
+// The header and footer counters read settled board state, so no page can be
+// prerendered without freezing those numbers at build time.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Rules · rankstr" };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

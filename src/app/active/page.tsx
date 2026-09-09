@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { curatedActiveIndex } from "@/lib/seed";
 import { stripQueryParams } from "@/lib/utils";
 
+// The header and footer counters read settled board state, so no page can be
+// prerendered without freezing those numbers at build time.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Active projects · rankstr" };
 
 export default function ActiveIndexPage() {
