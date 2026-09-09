@@ -20,11 +20,21 @@ With no environment set at all the board runs on an in-process store and a mock 
 
 | Route | What it is |
 | --- | --- |
-| `/` | Main board, 20 rows per page |
-| `/c/[slug]` | Category board — same rules, narrower scope |
+| `/` | All-time board, 20 rows per page |
+| `/today` | Rolling 24h board — same listings, ranked on the last day of payments |
+| `/daily` | UTC calendar-day archive; the current day stays live until midnight UTC |
+| `/categories` | Category index with the leader of each board |
+| `/category/[slug]` | Category board — same rules, narrower scope (`/c/[slug]` redirects here) |
 | `/rules` | The ranking contract |
 | `/active` | Curated index of active projects (seeded, not discovery) |
 | `/go/[id]` | Outbound click: counts the click, redirects without query parameters |
+
+### The three windows
+
+One payment ranks a listing on every board that includes that spend; the boards differ only in the
+slice of time they count. All-time never expires, Today is a rolling 24 hours, and Daily buckets by
+UTC calendar day and freezes once the day closes. All three read the same settled payments, so there
+is no separate ranking to keep in sync.
 
 ## Environment
 
@@ -92,7 +102,8 @@ blocks the board or a bid. No NIP-07, no signing, no spend.
 
 ## Data
 
-- Schema: `src/db/schema.ts` · migrations `drizzle/0000_init.sql`, `drizzle/0001_outbid_parity.sql`
+- Schema: `src/db/schema.ts` · migrations `drizzle/0000_init.sql`, `drizzle/0001_outbid_parity.sql`,
+  `drizzle/0002_listing_description.sql`
 - Seed: `DATABASE_URL=… npm run db:seed`
 - Seed rows are development data, not traction.
 
@@ -105,4 +116,12 @@ npm test
 npm run build
 ```
 
-Bitcoin-only public copy. Prod and DNS remain gated.
+## Look and feel
+
+The public UI is a visual clone of [outbid.lol](https://outbid.lol): warm paper background, coral
+accent, Poppins, pill controls, and a 14px card radius. The tokens are read off the live stylesheet
+and recorded in [`docs/outbid-reference.md`](./docs/outbid-reference.md), which also lists every
+place rankstr deliberately diverges. The Basalt / vermilion / brass system in [`brand/`](./brand/)
+does not govern the public UI.
+
+Bitcoin-only public copy. Every amount on the site is sats. Prod and DNS remain gated.

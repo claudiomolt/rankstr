@@ -2,7 +2,6 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { BoardPagination } from "@/components/BoardPagination";
 import { BoardRow } from "@/components/BoardRow";
 import { BoardTabs } from "@/components/BoardTabs";
-import { CategoryRail } from "@/components/CategoryRail";
 import { ClaimPanel } from "@/components/ClaimPanel";
 import { TakeoverBanner } from "@/components/TakeoverBanner";
 import { TodayTopStrip } from "@/components/TodayTopStrip";

@@ -1,5 +1,6 @@
 import { SimplePool, useWebSocketImplementation as setWebSocketImpl } from "nostr-tools/pool";
 import WebSocket from "ws";
+import { globalSingleton } from "@/lib/global-singleton";
 import { decodeNpub } from "./npub";
 import type { FetchProfileOptions, Profile } from "./types";
 
@@ -12,13 +13,39 @@ export const DEFAULT_NOSTR_RELAYS = [
 
 let wsWired = false;
 
+/**
+ * Closing the pool while a relay socket is still handshaking makes `ws` emit an
+ * `error` event with no listener, which Node escalates to an uncaught exception
+ * and takes the render down with it. Profile enrichment is meant to fail open,
+ * so every socket gets a no-op listener.
+ */
+class QuietWebSocket extends WebSocket {
+  constructor(...args: ConstructorParameters<typeof WebSocket>) {
+    super(...args);
+    this.on("error", () => {});
+  }
+}
+
 function ensureNodeWebSocket(): void {
   if (wsWired) return;
   if (typeof window === "undefined") {
     // nostr-tools setter (not a React Hook) — aliased so eslint hooks rule ignores it
-    setWebSocketImpl(WebSocket as unknown as typeof globalThis.WebSocket);
+    setWebSocketImpl(QuietWebSocket as unknown as typeof globalThis.WebSocket);
   }
   wsWired = true;
+}
+
+const PROFILE_TTL_MS = 5 * 60 * 1000;
+
+type CacheEntry = { profile: Profile | null; at: number };
+
+/**
+ * Relay round-trips cost up to `timeoutMs` per npub and the board renders the
+ * same handful of listings on every request, so resolved profiles are held for
+ * a few minutes rather than refetched per page view.
+ */
+function profileCache(): Map<string, CacheEntry> {
+  return globalSingleton("nostr-profile-cache", () => new Map<string, CacheEntry>());
 }
 
 export function getNostrRelays(override?: string[]): string[] {
@@ -118,22 +145,35 @@ export async function fetchProfile(
   }
 }
 
-/** Resolve many npubs fail-soft (Promise.allSettled). */
+/** Resolve many npubs fail-soft (Promise.allSettled), reusing recent lookups. */
 export async function fetchProfiles(
   npubs: string[],
   opts: FetchProfileOptions = {},
 ): Promise<Map<string, Profile | null>> {
   const unique = [...new Set(npubs.map((n) => n.trim()).filter(Boolean))];
-  const settled = await Promise.allSettled(
-    unique.map((npub) => fetchProfile(npub, opts)),
-  );
   const map = new Map<string, Profile | null>();
-  unique.forEach((npub, i) => {
+  if (unique.length === 0) return map;
+
+  const cache = profileCache();
+  const now = Date.now();
+  const misses: string[] = [];
+
+  for (const npub of unique) {
+    const hit = cache.get(npub);
+    if (hit && now - hit.at < PROFILE_TTL_MS) {
+      map.set(npub, hit.profile);
+    } else {
+      misses.push(npub);
+    }
+  }
+
+  const settled = await Promise.allSettled(misses.map((npub) => fetchProfile(npub, opts)));
+  misses.forEach((npub, i) => {
     const result = settled[i];
-    map.set(
-      npub,
-      result.status === "fulfilled" ? result.value : null,
-    );
+    const profile = result.status === "fulfilled" ? result.value : null;
+    cache.set(npub, { profile, at: Date.now() });
+    map.set(npub, profile);
   });
+
   return map;
 }

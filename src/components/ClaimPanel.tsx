@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { SelectField, TextField } from "@/components/ui/Field";
 import { CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
 import { BID_STEP_SATS, MIN_BID_SATS, type BoardWindow } from "@/lib/rankings";
-import { cn, formatCount, formatSatsShort } from "@/lib/utils";
+import { cn, formatSatsShort } from "@/lib/utils";
 
 type Reservation = {
   bidId: string;
@@ -61,6 +61,7 @@ export function ClaimPanel({
   const [stage, setStage] = useState<Stage>("form");
   const [sats, setSats] = useState(claimTopSats);
   const [identity, setIdentity] = useState("");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(categorySlug ?? DEFAULT_CATEGORY);
   const [agreed, setAgreed] = useState(false);
@@ -139,6 +140,7 @@ export function ClaimPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           identity,
+          title: title || undefined,
           description: description || undefined,
           categorySlug: category,
           bidSats: Math.floor(sats),
@@ -199,6 +201,7 @@ export function ClaimPanel({
     setReservation(null);
     setSettlement(null);
     setIdentity("");
+    setTitle("");
     setDescription("");
     setError(null);
     startedAt.current = 0;
@@ -257,31 +260,27 @@ export function ClaimPanel({
             </Button>
             <label
               htmlFor={amountFieldId}
-              className="relative inline-block text-primary underline decoration-2 decoration-dashed underline-offset-[6px]"
+              className="inline-flex items-baseline gap-1.5 text-primary underline decoration-2 decoration-dashed underline-offset-[6px]"
             >
               <span className="sr-only">Amount in sats</span>
-              <span className="invisible whitespace-nowrap tabular-nums">
-                {formatCount(sats)} sats
-              </span>
-              <span className="absolute inset-0 flex items-baseline">
+              {/* The invisible copy sizes the box to the digits so the field never jumps. */}
+              <span className="relative inline-block tabular-nums">
+                <span aria-hidden className="invisible whitespace-nowrap">
+                  {sats}
+                </span>
                 <input
                   id={amountFieldId}
                   type="number"
                   min={MIN_BID_SATS}
                   step={BID_STEP_SATS}
                   value={sats}
-                  onChange={(e) =>
-                    setSats(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                  }
+                  onChange={(e) => setSats(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                   onBlur={() => setSats((v) => Math.max(MIN_BID_SATS, v))}
-                  className="w-full bg-transparent text-center tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  aria-describedby={`${amountFieldId}-unit`}
+                  className="absolute inset-0 w-full bg-transparent text-center tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </span>
+              <span className="text-[0.55em] font-semibold">sats</span>
             </label>
-            <span id={`${amountFieldId}-unit`} className="sr-only">
-              sats
-            </span>
             <Button
               type="button"
               variant="soft"
@@ -327,16 +326,26 @@ export function ClaimPanel({
               Claim rank
             </Button>
           </div>
-          <div className="mx-auto w-[90%] md:w-full">
-            <TextField
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="One line about it (optional)"
-              aria-label="One line about your listing"
-              maxLength={180}
-              className="text-sm"
-            />
-          </div>
+          {identity.trim() ? (
+            <div className="mx-auto flex w-[90%] animate-fade-in flex-col gap-2.5 md:w-full md:flex-row md:gap-3">
+              <TextField
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Name (optional)"
+                aria-label="Listing name"
+                maxLength={80}
+                className="text-sm md:w-64"
+              />
+              <TextField
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="One line about it (optional)"
+                aria-label="One line about your listing"
+                maxLength={180}
+                className="text-sm"
+              />
+            </div>
+          ) : null}
           {error && stage === "form" ? (
             <p className="text-center text-sm text-destructive">{error}</p>
           ) : null}
